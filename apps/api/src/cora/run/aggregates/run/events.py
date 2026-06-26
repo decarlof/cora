@@ -216,6 +216,16 @@ class RunStarted:
     # `payload.get("pinned_calibration_ids", [])` returning an empty list
     # for legacy streams without the field.
     pinned_calibration_ids: tuple[UUID, ...] = ()
+    # input Dataset references (PROV `used`): the set of
+    # Dataset ids a reconstruction Run consumes. Each reference targets
+    # the Dataset, not a Distribution. Tuple (not frozenset) on the
+    # event payload for deterministic byte ordering during replay; the
+    # evolver reconstructs the frozenset. NO cross-BC existence check at
+    # the decider (id-only atomic refs; cross-BC eventual-consistency
+    # stance, same as pinned_calibration_ids). Forward-compat via
+    # `payload.get("input_dataset_ids", [])` returning an empty list for
+    # legacy streams without the field.
+    input_dataset_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -628,6 +638,7 @@ def to_payload(event: RunEvent) -> dict[str, Any]:
             campaign_id=campaign_id,
             decided_by_decision_id=decided_by_decision_id,
             pinned_calibration_ids=pinned_calibration_ids,
+            input_dataset_ids=input_dataset_ids,
             occurred_at=occurred_at,
         ):
             return {
@@ -660,6 +671,10 @@ def to_payload(event: RunEvent) -> dict[str, Any]:
                 # deterministic byte ordering (the typed in-memory shape is
                 # frozenset; the wire shape is a sorted list for stable bytes).
                 "pinned_calibration_ids": sorted(str(pin) for pin in pinned_calibration_ids),
+                # Dataset ids sorted lexicographically for deterministic byte
+                # ordering (the typed in-memory shape is frozenset; the wire
+                # shape is a sorted list for stable bytes).
+                "input_dataset_ids": sorted(str(ds) for ds in input_dataset_ids),
                 "occurred_at": occurred_at.isoformat(),
             }
         case RunHeld(
@@ -835,7 +850,8 @@ def from_stored(stored: StoredEvent) -> RunEvent:
                 # `trigger_source`, `external_refs`,
                 # `acknowledged_cautions`, `campaign_id`,
                 # `decided_by_decision_id` (Decision-to-Run linkage),
-                # `pinned_calibration_ids` (Calibration AsShot anchor)
+                # `pinned_calibration_ids` (Calibration AsShot anchor),
+                # `input_dataset_ids` (PROV `used` input Dataset refs)
                 # were all added additively. Each .get(...) returns
                 # the field's default when the key isn't in the jsonb
                 # payload, so legacy streams replay without an upcaster.
@@ -870,6 +886,7 @@ def from_stored(stored: StoredEvent) -> RunEvent:
                     pinned_calibration_ids=tuple(
                         UUID(p) for p in payload.get("pinned_calibration_ids", [])
                     ),
+                    input_dataset_ids=tuple(UUID(x) for x in payload.get("input_dataset_ids", [])),
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 )
 

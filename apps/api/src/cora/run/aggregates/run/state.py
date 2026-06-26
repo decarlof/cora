@@ -124,6 +124,14 @@ RUN_NAME_MAX_LENGTH = 200
 # anti-hook #3 — but unbounded set growth would still bloat events +
 # payloads with no domain justification).
 RUN_PINNED_CALIBRATIONS_MAX_ENTRIES = 64
+# cardinality cap on the input Dataset ref set
+# (Run.input_dataset_ids). Same default + same precedent justification
+# as RUN_PINNED_CALIBRATIONS_MAX_ENTRIES: per-entry existence is NOT
+# checked at the write path (the cited Datasets are cross-BC eventual-
+# consistency references, PROV `used` atomic IDs targeting the Dataset
+# not a Distribution) but unbounded set growth would still bloat events
+# + payloads with no domain justification.
+RUN_INPUT_DATASETS_MAX_ENTRIES = 64
 
 # `Identifier(scheme, value)` carries open-scheme anti-corruption refs
 # mirroring the Safety BC's ExternalBinding shape (proposal / btr /
@@ -1203,6 +1211,19 @@ class Run:
     # (Q5/Q6 research). Defaults to empty frozenset so legacy streams
     # without the field fold cleanly via `payload.get("pinned_calibration_ids", [])`.
     pinned_calibration_ids: frozenset[UUID] = field(default_factory=frozenset[UUID])
+    # input Dataset reference set: the Dataset id(s) a
+    # reconstruction Run consumes (PROV `used`: an Activity used an
+    # Entity; the reference targets the DATASET, not a Distribution).
+    # Each entry is a Dataset.id. NO cross-BC existence check at the
+    # write path (id-only atomic refs; cross-BC eventual-consistency
+    # stance, same as pinned_calibration_ids); only set cardinality is
+    # validated. Defaults to empty frozenset so legacy streams without
+    # the field fold cleanly via
+    # `payload.get("input_dataset_ids", [])` (additive-state pattern).
+    # The start_run gate will later read each input Dataset's Verified
+    # Distribution; that read goes through the Data BC, never a fold-
+    # time check here.
+    input_dataset_ids: frozenset[UUID] = field(default_factory=frozenset[UUID])
     # conduct-observed actuation provenance. None until a terminal
     # event sets it: only RunCompleted / RunAborted issued by the
     # compute CONDUCT runtime (`Reckoner`) carry a non-None
@@ -1354,4 +1375,46 @@ def validate_pinned_calibration_ids(value: frozenset[UUID]) -> frozenset[UUID]:
     """
     if len(value) > RUN_PINNED_CALIBRATIONS_MAX_ENTRIES:
         raise InvalidPinnedCalibrationsError(len(value))
+    return value
+
+
+class InvalidInputDatasetsError(ValueError):
+    """The supplied input_dataset_ids set has too many entries.
+
+    Per-entry validation (each is a UUID) is type-enforced; the
+    set-cardinality cap protects against accidentally massive input-
+    Dataset reference payloads on a single reconstruction Run start.
+    Mirrors `InvalidPinnedCalibrationsError` shape exactly (same
+    precedent + same default cap of 64). Validated at the decider; the
+    API boundary also enforces `max_length` via Pydantic for fast 422
+    failures on obviously-malformed input.
+
+    NO cross-BC existence check on the cited Dataset ids (PROV `used`
+    atomic-ID model targeting the Dataset, not a Distribution) +
+    canonical DDD eventual-consistency stance on cross-aggregate rules
+    (Vernon/Evans). Symmetric to the pinned_calibration_ids decider-
+    time treatment.
+
+    Mapped to HTTP 400.
+    """
+
+    def __init__(self, count: int) -> None:
+        super().__init__(
+            f"Run input_dataset_ids must have at most "
+            f"{RUN_INPUT_DATASETS_MAX_ENTRIES} entries (got: {count})"
+        )
+        self.count = count
+
+
+def validate_input_dataset_ids(value: frozenset[UUID]) -> frozenset[UUID]:
+    """Normalize / validate input_dataset_ids for the Run state and decider.
+
+    Cardinality-only check. NO per-element existence check (PROV `used`
+    atomic-ID model targeting the Dataset, not a Distribution; cross-BC
+    eventual-consistency per Vernon/Evans DDD canon). Mirrors
+    `validate_pinned_calibration_ids` exactly: same shape, same default
+    cap, same justification.
+    """
+    if len(value) > RUN_INPUT_DATASETS_MAX_ENTRIES:
+        raise InvalidInputDatasetsError(len(value))
     return value

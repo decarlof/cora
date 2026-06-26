@@ -99,6 +99,7 @@ from cora.run.aggregates.run import (
     RunSubjectNotMountableError,
     check_safety_envelope,
     validate_effective_parameters_against_method_schema,
+    validate_input_dataset_ids,
     validate_pinned_calibration_ids,
 )
 from cora.run.features.start_run.command import StartRun
@@ -193,6 +194,9 @@ def decide(
       - pinned_calibration_ids cardinality must be within bound
         -> InvalidPinnedCalibrationsError
         (via validate_pinned_calibration_ids)
+      - input_dataset_ids cardinality must be within bound
+        -> InvalidInputDatasetsError
+        (via validate_input_dataset_ids)
 
     `needed_family_ids_snapshot` is the Method's needed_family_ids
     set the handler resolved transitively from `plan.practice_id →
@@ -315,6 +319,13 @@ def decide(
     # for Dataset.used_calibration_ids exactly.
     pinned_calibration_ids = validate_pinned_calibration_ids(command.pinned_calibration_ids)
 
+    # cardinality cap on the input Dataset reference set
+    # (PROV `used`). NO cross-BC existence check (id-only atomic refs;
+    # eventual-consistency stance, same as pinned_calibration_ids). The
+    # start_run gate that reads each input Dataset's Verified
+    # Distribution lands separately and goes through the Data BC.
+    input_dataset_ids = validate_input_dataset_ids(command.input_dataset_ids)
+
     # build the acknowledged_cautions snapshot for the
     # RunStarted event payload. Per the Caution design memo, this
     # snapshot IS the ack (anti-pattern #7: ack lives on the
@@ -356,6 +367,9 @@ def decide(
             # payload (frozenset has no inherent order). The cardinality
             # check ran earlier via validate_pinned_calibration_ids (12b-5).
             pinned_calibration_ids=tuple(sorted(pinned_calibration_ids)),
+            # sort for deterministic byte-form on the event payload; the
+            # cardinality check ran earlier via validate_input_dataset_ids.
+            input_dataset_ids=tuple(sorted(input_dataset_ids)),
             occurred_at=now,
         )
     ]

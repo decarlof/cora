@@ -90,3 +90,12 @@ class StartRun:
     # stance); a downstream consumer that needs to read the pinned
     # CalibrationRevision still goes through the Calibration BC.
     pinned_calibration_ids: frozenset[UUID] = field(default_factory=frozenset[UUID])
+    # input Dataset references (PROV `used`): the set of
+    # Dataset ids a reconstruction Run consumes. Each reference targets
+    # the Dataset, not a Distribution. Operator-supplied (or, in the
+    # autonomous-CT future, agent-supplied). IMMUTABLE on the Run
+    # aggregate after start_run, like pinned_calibration_ids. NO cross-
+    # BC existence check at the decider (cross-BC eventual-consistency
+    # stance); the start_run gate that reads each input Dataset's
+    # Verified Distribution goes through the Data BC.
+    input_dataset_ids: frozenset[UUID] = field(default_factory=frozenset[UUID])

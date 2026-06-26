@@ -46,6 +46,7 @@ InvalidRunInterruptedAtError).
     InvalidRunAdjustSchemaError, InvalidRunAdjustReasonError
   - 409 (Run adjust transition guard, 6j): RunCannotAdjustError
   - 400 (validation, 12b-5 adds): InvalidPinnedCalibrationsError
+  - 400 (validation): InvalidInputDatasetsError
 """
 
 from fastapi import FastAPI, Request, status
@@ -53,6 +54,7 @@ from fastapi.responses import JSONResponse
 
 from cora.run.aggregates.run import (
     InvalidChannelNameError,
+    InvalidInputDatasetsError,
     InvalidObservationValueError,
     InvalidPinnedCalibrationsError,
     InvalidRunAbortReasonError,
@@ -196,6 +198,9 @@ def register_run_routes(app: FastAPI) -> None:
         # Pin-set cardinality cap on AsShot citation (12b-5; symmetric
         # to Data BC's InvalidUsedCalibrationsError on register_dataset).
         InvalidPinnedCalibrationsError,
+        # Input-Dataset reference set cardinality cap (PROV `used`;
+        # symmetric to the pinned_calibration_ids cap).
+        InvalidInputDatasetsError,
     ):
         app.add_exception_handler(validation_cls, _handle_validation_error)
     for not_found_cls in (RunNotFoundError,):
