@@ -50,6 +50,12 @@ from cora.infrastructure.ports.credential_lookup import (
     CredentialLookup,
     CredentialLookupResult,
 )
+from cora.infrastructure.ports.dataset_distribution_lookup import (
+    DatasetDistributionLookup,
+    DatasetDistributionLookupResult,
+    NoDatasetDistributionsLookup,
+    SeededDatasetDistributionLookup,
+)
 from cora.infrastructure.ports.enclosure_lookup import (
     AlwaysPermittedEnclosureLookup,
     EnclosureLookup,
@@ -178,6 +184,8 @@ __all__ = [
     "ConcurrencyError",
     "CredentialLookup",
     "CredentialLookupResult",
+    "DatasetDistributionLookup",
+    "DatasetDistributionLookupResult",
     "Deny",
     "EnclosureLookup",
     "EnclosureLookupResult",
@@ -217,6 +225,7 @@ __all__ = [
     "MinSeverity",
     "ModelRef",
     "NewEvent",
+    "NoDatasetDistributionsLookup",
     "NoSuppliesRegisteredLookup",
     "NullInferenceRecorder",
     "PrincipalKind",
@@ -224,6 +233,7 @@ __all__ = [
     "ProfileStore",
     "RoleLookup",
     "RoleLookupResult",
+    "SeededDatasetDistributionLookup",
     "Signer",
     "SignerKeyInactiveError",
     "SignerKeyNotFoundError",

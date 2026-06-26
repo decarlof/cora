@@ -43,6 +43,18 @@ decider gates on at-least-one-AVAILABLE per kind per
 short-circuits: no port call, decider sees empty satisfaction map,
 gate trivially passes.
 
+## Input-data satisfaction pre-load
+
+If `command.input_dataset_ids` is non-empty (a reconstruction Run
+declaring its inputs), the handler invokes
+`deps.dataset_distribution_lookup.find_by_dataset(dataset_id)` for each
+declared input and threads the results into
+`RunStartContext.input_distributions`. The decider gates on at-least-one
+Verified Distribution per declared input (genesis-only). Empty
+input_dataset_ids short-circuits: no port call, decider sees an empty
+mapping, gate trivially passes. See
+[[project_run_input_dependency_design]].
+
 ## Atomic co-write when started into a campaign
 
 If `command.campaign_id` is set, the new Run's genesis events AND the
@@ -72,7 +84,11 @@ from cora.equipment.aggregates.asset import Asset, AssetNotFoundError, load_asse
 from cora.infrastructure.event_envelope import to_new_event
 from cora.infrastructure.kernel import Kernel
 from cora.infrastructure.logging import get_logger
-from cora.infrastructure.ports import Deny, SupplyLookupResult
+from cora.infrastructure.ports import (
+    DatasetDistributionLookupResult,
+    Deny,
+    SupplyLookupResult,
+)
 from cora.infrastructure.ports.event_store import StreamAppend
 from cora.infrastructure.routing import NIL_SENTINEL_ID
 from cora.recipe.aggregates.method import MethodNotFoundError, load_method
@@ -350,6 +366,21 @@ def bind(deps: Kernel) -> Handler:
                 kind: tuple(refs) for kind, refs in satisfaction.items()
             }
 
+        # cross-BC input-data snapshot for the genesis-only input gate per
+        # [[project_run_input_dependency_design]]: for every Dataset id the
+        # caller declared in command.input_dataset_ids, load every non-
+        # Discarded Distribution so the decider can require at least one
+        # Verified per declared input. Empty input_dataset_ids short-
+        # circuits the port call (ordinary acquisition Runs declare no
+        # inputs; the feature stays dormant). The lookup goes through the
+        # Data BC adapter; Run never imports cora.data.
+        input_distributions: dict[UUID, tuple[DatasetDistributionLookupResult, ...]] = {}
+        if command.input_dataset_ids:
+            input_distributions = {
+                dataset_id: await deps.dataset_distribution_lookup.find_by_dataset(dataset_id)
+                for dataset_id in sorted(command.input_dataset_ids, key=str)
+            }
+
         # BEAM-1 cross-BC beam-availability pre-flight read: ask the
         # injected lookup for the live front-end + station shutter states
         # and the ACIS FES-permit composite at the start instant. The
@@ -368,6 +399,7 @@ def bind(deps: Kernel) -> Handler:
             referencing_clearances=referencing_clearances,
             active_cautions=active_cautions,
             needed_supplies_satisfaction=needed_supplies_satisfaction,
+            input_distributions=input_distributions,
             referencing_enclosures=referencing_enclosures,
             campaign=campaign,
             beam_availability=beam_availability,

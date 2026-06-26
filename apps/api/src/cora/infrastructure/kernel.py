@@ -55,6 +55,7 @@ from cora.infrastructure.ports import (
     ClearanceTemplateLookup,
     Clock,
     CredentialLookup,
+    DatasetDistributionLookup,
     EnclosureLookup,
     EventStore,
     FacilityLookup,
@@ -150,6 +151,19 @@ class Kernel:
     `NoSuppliesRegisteredLookup` for the missing-kind path. Mirrors
     the `ClearanceLookup` / `CautionLookup` test-default pattern.
     See [[project_supply_preflight_gate_design]].
+
+    `dataset_distribution_lookup`: cross-BC port consumed by Run BC's
+    `start_run` handler to gate a reconstruction Run on each declared
+    input Dataset (`StartRun.input_dataset_ids`) having a Verified
+    Distribution (genesis-only). Data BC ships
+    `PostgresDatasetDistributionLookup` as the production adapter (reads
+    `proj_data_distribution_summary`, excludes Discarded rows). Test
+    environments default to `NoDatasetDistributionsLookup` (every Dataset
+    has no Distribution), the conservative default: a Run that declares an
+    input but seeds nothing fails the gate. Gate-specific tests override
+    with `SeededDatasetDistributionLookup`. Ordinary acquisition Runs
+    declare no inputs, so the handler skips the lookup and the gate is
+    dormant. See [[project_run_input_dependency_design]].
 
     `credential_lookup`: cross-BC port consumed by Federation BC's
     seal handlers (`initialize_seal`, `rotate_seal_online_key`) to
@@ -289,6 +303,7 @@ class Kernel:
     caution_lookup: CautionLookup
     capability_lookup: CapabilityLookup
     supply_lookup: SupplyLookup
+    dataset_distribution_lookup: DatasetDistributionLookup
     credential_lookup: CredentialLookup
     facility_lookup: FacilityLookup
     asset_lookup: AssetLookup

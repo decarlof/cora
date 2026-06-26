@@ -35,6 +35,10 @@ from cora.equipment.aggregates.asset.events import (
 from cora.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from cora.infrastructure.event_envelope import to_new_event
 from cora.infrastructure.ports.beam_availability_lookup import BeamAvailabilityLookupResult
+from cora.infrastructure.ports.dataset_distribution_lookup import (
+    DatasetDistributionLookupResult,
+    SeededDatasetDistributionLookup,
+)
 from cora.recipe.aggregates.method import MethodNotFoundError
 from cora.recipe.aggregates.method.events import MethodDefined
 from cora.recipe.aggregates.method.events import (
@@ -60,6 +64,7 @@ from cora.run.aggregates.run import (
     RunBeamAvailabilityUnknownError,
     RunBoundPlanDeprecatedError,
     RunCapabilitiesNotSatisfiedError,
+    RunInputNotVerifiedError,
     RunPlanAssetDecommissionedError,
     RunRequiresOpenBeamShuttersError,
     RunSubjectNotMountableError,
@@ -883,6 +888,76 @@ async def test_handler_without_campaign_id_uses_single_stream_append() -> None:
     assert result == _NEW_ID
     run_events, _ = await store.load("Run", _NEW_ID)
     assert run_events[0].payload.get("campaign_id") is None
+
+
+# ---------- Input-data genesis gate (handler threads the lookup) ----------
+
+
+@pytest.mark.unit
+async def test_handler_starts_when_declared_input_has_a_verified_distribution() -> None:
+    """Happy path: a SeededDatasetDistributionLookup with a Verified row for
+    the declared input lets the reconstruction Run start. Proves the handler
+    reads `deps.dataset_distribution_lookup` and threads its result into the
+    decider's input gate."""
+    store = InMemoryEventStore()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    input_dataset_id = uuid4()
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    deps = replace(
+        deps,
+        dataset_distribution_lookup=SeededDatasetDistributionLookup(
+            {
+                input_dataset_id: (
+                    DatasetDistributionLookupResult(
+                        distribution_id=uuid4(),
+                        dataset_id=input_dataset_id,
+                        supply_id=uuid4(),
+                        status="Verified",
+                    ),
+                )
+            }
+        ),
+    )
+    handler = start_run.bind(deps)
+
+    result = await handler(
+        StartRun(
+            name="Reconstruct",
+            plan_id=plan_id,
+            subject_id=subject_id,
+            input_dataset_ids=frozenset({input_dataset_id}),
+        ),
+        principal_id=_PRINCIPAL_ID,
+        correlation_id=_CORRELATION_ID,
+    )
+    assert result == _NEW_ID
+    events, _ = await store.load("Run", _NEW_ID)
+    assert events[0].payload["input_dataset_ids"] == [str(input_dataset_id)]
+
+
+@pytest.mark.unit
+async def test_handler_raises_input_not_verified_with_default_lookup() -> None:
+    """The in-memory default (NoDatasetDistributionsLookup) reports no
+    Distribution for any Dataset, so a Run declaring an input fails the
+    genesis input gate."""
+    store = InMemoryEventStore()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    input_dataset_id = uuid4()
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    handler = start_run.bind(deps)
+
+    with pytest.raises(RunInputNotVerifiedError) as exc_info:
+        await handler(
+            StartRun(
+                name="Reconstruct",
+                plan_id=plan_id,
+                subject_id=subject_id,
+                input_dataset_ids=frozenset({input_dataset_id}),
+            ),
+            principal_id=_PRINCIPAL_ID,
+            correlation_id=_CORRELATION_ID,
+        )
+    assert exc_info.value.dataset_id == input_dataset_id
 
 
 # ---------- BEAM-1 beam-availability gate (handler threads the lookup) ----------

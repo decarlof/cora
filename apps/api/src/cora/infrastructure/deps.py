@@ -95,6 +95,7 @@ from cora.infrastructure.ports import (
     ClearanceTemplateLookup,
     Clock,
     CredentialLookup,
+    DatasetDistributionLookup,
     EnclosureLookup,
     EventStore,
     FacilityLookup,
@@ -102,6 +103,7 @@ from cora.infrastructure.ports import (
     IdempotencyStore,
     IdGenerator,
     LogbookMirror,
+    NoDatasetDistributionsLookup,
     ProfileStore,
     RoleLookup,
     SupplyLookup,
@@ -160,6 +162,7 @@ def make_postgres_kernel(
     caution_lookup: CautionLookup | None = None,
     capability_lookup: CapabilityLookup | None = None,
     supply_lookup: SupplyLookup | None = None,
+    dataset_distribution_lookup: DatasetDistributionLookup | None = None,
     credential_lookup: CredentialLookup | None = None,
     facility_lookup: FacilityLookup | None = None,
     asset_lookup: AssetLookup | None = None,
@@ -219,6 +222,15 @@ def make_postgres_kernel(
     injects the real `PostgresSupplyLookup` via the
     `supply_lookup_factory` argument; gate-specific tests override
     here explicitly. See [[project_supply_preflight_gate_design]].
+
+    `dataset_distribution_lookup` defaults to `NoDatasetDistributionsLookup`
+    (every Dataset has no Distribution): the conservative default for the
+    genesis-only input gate, so a Run declaring an input but seeding
+    nothing fails. Production's `build_kernel` injects the real
+    `PostgresDatasetDistributionLookup` via the
+    `dataset_distribution_lookup_factory` argument; gate-specific tests
+    override here with `SeededDatasetDistributionLookup`. See
+    [[project_run_input_dependency_design]].
 
     `credential_lookup` defaults to a fresh `InMemoryCredentialLookup`
     (empty record map). Seal handler / decider tests seed credentials
@@ -299,6 +311,11 @@ def make_postgres_kernel(
             capability_lookup if capability_lookup is not None else AlwaysEmptyCapabilityLookup()
         ),
         supply_lookup=(supply_lookup if supply_lookup is not None else AllSatisfiedSupplyLookup()),
+        dataset_distribution_lookup=(
+            dataset_distribution_lookup
+            if dataset_distribution_lookup is not None
+            else NoDatasetDistributionsLookup()
+        ),
         credential_lookup=(
             credential_lookup if credential_lookup is not None else InMemoryCredentialLookup()
         ),
@@ -341,6 +358,7 @@ def make_inmemory_kernel(
     caution_lookup: CautionLookup | None = None,
     capability_lookup: CapabilityLookup | None = None,
     supply_lookup: SupplyLookup | None = None,
+    dataset_distribution_lookup: DatasetDistributionLookup | None = None,
     credential_lookup: CredentialLookup | None = None,
     facility_lookup: FacilityLookup | None = None,
     asset_lookup: AssetLookup | None = None,
@@ -392,6 +410,14 @@ def make_inmemory_kernel(
     reason: no projection worker, no `proj_supply_summary` table to
     read from. Gate-specific tests can override with
     `NoSuppliesRegisteredLookup` (missing-kind path) or a custom fake.
+
+    `dataset_distribution_lookup` defaults to `NoDatasetDistributionsLookup`
+    for the same reason: no projection worker, no
+    `proj_data_distribution_summary` table to read from. The default is
+    conservative (every Dataset has no Distribution), so a Run declaring
+    an input fails the genesis input gate unless the test overrides with
+    `SeededDatasetDistributionLookup`. Ordinary Runs declare no inputs,
+    so the gate is dormant. See [[project_run_input_dependency_design]].
 
     `credential_lookup` defaults to a fresh `InMemoryCredentialLookup`
     for the same reason: no projection worker, no
@@ -466,6 +492,11 @@ def make_inmemory_kernel(
             capability_lookup if capability_lookup is not None else AlwaysEmptyCapabilityLookup()
         ),
         supply_lookup=(supply_lookup if supply_lookup is not None else AllSatisfiedSupplyLookup()),
+        dataset_distribution_lookup=(
+            dataset_distribution_lookup
+            if dataset_distribution_lookup is not None
+            else NoDatasetDistributionsLookup()
+        ),
         credential_lookup=(
             credential_lookup if credential_lookup is not None else InMemoryCredentialLookup()
         ),
@@ -578,6 +609,25 @@ class SupplyLookupFactory(Protocol):
         self,
         pool: asyncpg.Pool,
     ) -> SupplyLookup: ...
+
+
+class DatasetDistributionLookupFactory(Protocol):
+    """Builds the production DatasetDistributionLookup port for the Kernel.
+
+    Data BC's `cora.data.adapters.PostgresDatasetDistributionLookup` is
+    the production factory; `cora.api.main` binds it. Same factory-
+    injection shape as the other lookup factories so
+    `cora.infrastructure.deps` doesn't import from any BC.
+
+    `pool` is `None` only when `app_env=test`; the production factory
+    requires a real pool. Test mode falls back to
+    `NoDatasetDistributionsLookup` automatically.
+    """
+
+    def __call__(
+        self,
+        pool: asyncpg.Pool,
+    ) -> DatasetDistributionLookup: ...
 
 
 class CredentialLookupFactory(Protocol):
@@ -768,6 +818,7 @@ async def build_kernel(
     caution_lookup_factory: CautionLookupFactory | None = None,
     capability_lookup_factory: CapabilityLookupFactory | None = None,
     supply_lookup_factory: SupplyLookupFactory | None = None,
+    dataset_distribution_lookup_factory: DatasetDistributionLookupFactory | None = None,
     credential_lookup_factory: CredentialLookupFactory | None = None,
     facility_lookup_factory: FacilityLookupFactory | None = None,
     asset_lookup_factory: AssetLookupFactory | None = None,
@@ -875,6 +926,11 @@ async def build_kernel(
         if supply_lookup_factory is not None
         else AllSatisfiedSupplyLookup()
     )
+    dataset_distribution_lookup: DatasetDistributionLookup = (
+        dataset_distribution_lookup_factory(pool)
+        if dataset_distribution_lookup_factory is not None
+        else NoDatasetDistributionsLookup()
+    )
     credential_lookup: CredentialLookup = (
         credential_lookup_factory(pool)
         if credential_lookup_factory is not None
@@ -923,6 +979,7 @@ async def build_kernel(
         caution_lookup=caution_lookup,
         capability_lookup=capability_lookup,
         supply_lookup=supply_lookup,
+        dataset_distribution_lookup=dataset_distribution_lookup,
         credential_lookup=credential_lookup,
         facility_lookup=facility_lookup,
         asset_lookup=asset_lookup,
@@ -1010,6 +1067,7 @@ __all__ = [
     "ClearanceLookupFactory",
     "ClearanceTemplateLookupFactory",
     "CredentialLookupFactory",
+    "DatasetDistributionLookupFactory",
     "EnclosureLookupFactory",
     "FacilityLookupFactory",
     "FamilyLookupFactory",

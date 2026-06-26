@@ -93,6 +93,7 @@ from cora.run.aggregates.run import (
     RunBoundPlanDeprecatedError,
     RunCannotJoinCampaignError,
     RunCapabilitiesNotSatisfiedError,
+    RunInputNotVerifiedError,
     RunName,
     RunPlanAssetDecommissionedError,
     RunStarted,
@@ -179,6 +180,9 @@ def decide(
         -> RunPlanAssetDecommissionedError
       - Union of current bound Asset families must cover Method's
         needed_family_ids -> RunCapabilitiesNotSatisfiedError
+      - Every declared input Dataset (command.input_dataset_ids) must
+        have at least one Verified Distribution (genesis-only; NOT
+        re-run on resume) -> RunInputNotVerifiedError
       - Effective parameters must validate against Method's
         parameters_schema (STRICT when schema is None; non-empty
         effective rejected)
@@ -323,8 +327,28 @@ def decide(
     # (PROV `used`). NO cross-BC existence check (id-only atomic refs;
     # eventual-consistency stance, same as pinned_calibration_ids). The
     # start_run gate that reads each input Dataset's Verified
-    # Distribution lands separately and goes through the Data BC.
+    # Distribution is the genesis-only check just below.
     input_dataset_ids = validate_input_dataset_ids(command.input_dataset_ids)
+
+    # genesis-only input-data gate: a reconstruction Run that declares
+    # input Datasets may not start unless EACH declared input has at
+    # least one Verified Distribution. The handler pre-loaded each input's
+    # non-Discarded Distributions into context.input_distributions via
+    # deps.dataset_distribution_lookup.find_by_dataset; an input absent
+    # from the mapping (no Distribution at all) or present with no Verified
+    # entry fails. This stays in the start_run decider rather than
+    # check_safety_envelope precisely because it is a genesis invariant,
+    # not a live-signal gate: a held Run's resume re-check shares the
+    # envelope and must NOT re-run this. Reachability and storage-tier are
+    # deferred; gate on present-and-Verified only per
+    # [[project_run_input_dependency_design]]. Empty input_dataset_ids
+    # makes the loop dormant (no lookup, gate passes trivially).
+    # "Verified" is the DistributionStatus.VERIFIED wire value (Run may
+    # not import cora.data.aggregates per the tach contract).
+    for dataset_id in sorted(input_dataset_ids, key=str):
+        distributions = context.input_distributions.get(dataset_id, ())
+        if not any(d.status == "Verified" for d in distributions):
+            raise RunInputNotVerifiedError(run_id=new_id, dataset_id=dataset_id)
 
     # build the acknowledged_cautions snapshot for the
     # RunStarted event payload. Per the Caution design memo, this

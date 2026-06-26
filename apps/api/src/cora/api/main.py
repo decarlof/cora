@@ -111,6 +111,7 @@ from cora.data._bootstrap import (
     bootstrap_default_storage_supply,
     bootstrap_distribution_backfill,
 )
+from cora.data.adapters import PostgresDatasetDistributionLookup
 from cora.decision import (
     DecisionHandlers,
     register_decision_projections,
@@ -611,6 +612,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                 caution_lookup_factory=PostgresCautionLookup,
                 capability_lookup_factory=PostgresCapabilityLookup,
                 supply_lookup_factory=PostgresSupplyLookup,
+                dataset_distribution_lookup_factory=PostgresDatasetDistributionLookup,
                 credential_lookup_factory=PostgresCredentialLookup,
                 facility_lookup_factory=PostgresFacilityLookup,
                 asset_lookup_factory=PostgresAssetLookup,

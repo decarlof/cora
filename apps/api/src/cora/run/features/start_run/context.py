@@ -59,6 +59,9 @@ from cora.equipment.aggregates.asset import Asset
 from cora.infrastructure.ports.beam_availability_lookup import BeamAvailabilityLookupResult
 from cora.infrastructure.ports.caution_lookup import CautionLookupResult
 from cora.infrastructure.ports.clearance_lookup import ClearanceLookupResult
+from cora.infrastructure.ports.dataset_distribution_lookup import (
+    DatasetDistributionLookupResult,
+)
 from cora.infrastructure.ports.enclosure_lookup import EnclosureLookupResult
 from cora.infrastructure.ports.supply_lookup import SupplyLookupResult
 from cora.recipe.aggregates.plan import Plan
@@ -106,6 +109,22 @@ class RunStartContext:
     needed_supplies_satisfaction: Mapping[str, tuple[SupplyLookupResult, ...]] = field(
         default_factory=lambda: cast("Mapping[str, tuple[SupplyLookupResult, ...]]", {})
     )
+    input_distributions: Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]] = field(
+        default_factory=lambda: cast(
+            "Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]]", {}
+        )
+    )
+    """Mapping keyed by input `Dataset.id` carrying every non-Discarded
+    Distribution of that Dataset (loaded by the handler via
+    `deps.dataset_distribution_lookup.find_by_dataset` for each id in
+    `StartRun.input_dataset_ids`). The decider's genesis-only input gate
+    requires at least one entry per declared input to be in status
+    Verified; a Dataset absent from the mapping or present with no
+    Verified entry raises `RunInputNotVerifiedError`. Empty mapping is
+    the natural state for ordinary acquisition Runs that declare no
+    inputs (the handler skips the lookup entirely). Reachability and
+    storage-tier are deferred; the gate is present-and-Verified only per
+    [[project_run_input_dependency_design]]."""
     referencing_enclosures: tuple[EnclosureLookupResult, ...] = ()
     """Every Active Enclosure that any of the Run's scoped Assets (or
     their ancestors) declares as its `located_in_enclosure_id`. The

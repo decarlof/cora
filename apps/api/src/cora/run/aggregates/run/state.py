@@ -443,6 +443,33 @@ class RunRequiresActiveClearanceError(Exception):
         self.run_id = run_id
 
 
+class RunInputNotVerifiedError(Exception):
+    """A reconstruction Run's input Dataset has no Verified Distribution.
+
+    Cross-BC genesis gate: when `StartRun.input_dataset_ids` is non-empty
+    the handler pre-loads each input Dataset's non-Discarded Distributions
+    via `DatasetDistributionLookup.find_by_dataset` and the decider
+    requires at least ONE of them to be in status Verified. This error
+    fires when a declared input Dataset has zero Verified Distributions,
+    either because it has no Distribution at all or because every
+    Distribution is in another status (Registered / Stale / ...).
+
+    Genesis-only: the gate runs at first start, never on resume (a Run
+    that already passed it continues without re-checking). Reachability
+    and storage-tier are deferred; the gate is present-and-Verified only
+    per [[project_run_input_dependency_design]]. Mapped to HTTP 409.
+    """
+
+    def __init__(self, run_id: UUID, dataset_id: UUID) -> None:
+        super().__init__(
+            f"Run {run_id} cannot start: input Dataset {dataset_id} has no "
+            f"Verified Distribution. Register and verify a Distribution for "
+            f"that Dataset before starting the reconstruction."
+        )
+        self.run_id = run_id
+        self.dataset_id = dataset_id
+
+
 class RunClearanceCoverageMismatchError(Exception):
     """Clearances reference this Run's scope but none are Active.
 

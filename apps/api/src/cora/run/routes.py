@@ -36,6 +36,8 @@ InvalidRunInterruptedAtError).
     RunRequiresActiveClearanceError, RunClearanceCoverageMismatchError
   - 409 (Run-start supply pre-flight gate):
     RunRequiresAvailableSupplyError, RunSupplyCoverageMismatchError
+  - 409 (Run-start input-data genesis gate):
+    RunInputNotVerifiedError
   - 409 (Run transition guards, 6f-2): RunCannotCompleteError,
     RunCannotAbortError
   - 409 (Run transition guards, 6f-3): RunCannotHoldError,
@@ -83,6 +85,7 @@ from cora.run.aggregates.run import (
     RunCapabilitiesNotSatisfiedError,
     RunClearanceCoverageMismatchError,
     RunEnclosureCoverageMismatchError,
+    RunInputNotVerifiedError,
     RunNotFoundError,
     RunObservationLogbookClosedError,
     RunPlanAssetDecommissionedError,
@@ -228,6 +231,9 @@ def register_run_routes(app: FastAPI) -> None:
         # unknown branch when a beam PV could not be read.
         RunRequiresOpenBeamShuttersError,
         RunBeamAvailabilityUnknownError,
+        # Run-start input-data genesis gate: a declared input Dataset
+        # has no Verified Distribution.
+        RunInputNotVerifiedError,
         # Run-start campaign-membership gate (6i-c).
         RunCannotJoinCampaignError,
         # Run-side campaign-membership invariant (6i-c).

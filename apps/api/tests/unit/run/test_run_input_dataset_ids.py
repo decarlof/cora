@@ -21,6 +21,9 @@ from cora.equipment.aggregates.asset import (
     AssetTier,
 )
 from cora.infrastructure.ports.clearance_lookup import ClearanceLookupResult
+from cora.infrastructure.ports.dataset_distribution_lookup import (
+    DatasetDistributionLookupResult,
+)
 from cora.infrastructure.ports.event_store import StoredEvent
 from cora.recipe.aggregates.plan import Plan, PlanName, PlanStatus
 from cora.run.aggregates.run import (
@@ -78,7 +81,23 @@ def _subject() -> Subject:
     )
 
 
-def _context() -> tuple[RunStartContext, UUID, Subject]:
+def _verified(dataset_id: UUID) -> DatasetDistributionLookupResult:
+    return DatasetDistributionLookupResult(
+        distribution_id=uuid4(),
+        dataset_id=dataset_id,
+        supply_id=uuid4(),
+        status="Verified",
+    )
+
+
+def _context(
+    *, input_dataset_ids: frozenset[UUID] = frozenset()
+) -> tuple[RunStartContext, UUID, Subject]:
+    """Build a context that passes every start_run gate. Each id in
+    `input_dataset_ids` is seeded with a Verified Distribution so the
+    genesis input gate passes (these tests pin field threading +
+    cardinality, not the gate itself; see
+    test_start_run_input_gate_decider.py for the gate)."""
     cap = uuid4()
     asset_id = uuid4()
     plan = _plan(asset_ids=frozenset({asset_id}))
@@ -89,6 +108,7 @@ def _context() -> tuple[RunStartContext, UUID, Subject]:
         subject=subject,
         assets={asset_id: asset},
         referencing_clearances=_active_clearance_stub(),
+        input_distributions={ds: (_verified(ds),) for ds in input_dataset_ids},
     )
     return context, cap, subject
 
@@ -239,9 +259,9 @@ def test_run_started_input_dataset_ids_round_trip() -> None:
 def test_input_dataset_ids_flow_decider_to_run_state_as_frozenset() -> None:
     """End-to-end: decider -> RunStarted -> to_payload -> from_stored ->
     fold -> Run.input_dataset_ids as a frozenset (in-memory equality)."""
-    context, cap, subject = _context()
     ds_a = uuid4()
     ds_b = uuid4()
+    context, cap, subject = _context(input_dataset_ids=frozenset({ds_a, ds_b}))
     new_id = uuid4()
     decision = start_run.decide(
         state=None,
@@ -289,10 +309,10 @@ def test_decide_defaults_input_dataset_ids_to_empty_when_omitted() -> None:
 def test_decide_threads_input_dataset_ids_sorted_through_to_event() -> None:
     """The decider sorts the operator-supplied frozenset before emit so
     the event payload has deterministic bytes."""
-    context, cap, subject = _context()
     ds_a = uuid4()
     ds_b = uuid4()
     ds_c = uuid4()
+    context, cap, subject = _context(input_dataset_ids=frozenset({ds_a, ds_b, ds_c}))
     decision = start_run.decide(
         state=None,
         command=StartRun(
@@ -339,8 +359,8 @@ def test_decide_rejects_input_dataset_ids_over_cap() -> None:
 def test_decide_accepts_input_dataset_ids_exactly_at_cap() -> None:
     """Boundary guard: exactly at the cap is accepted (off-by-one mirror
     of the pinned_calibration_ids boundary test)."""
-    context, cap, subject = _context()
     at_cap = frozenset(uuid4() for _ in range(RUN_INPUT_DATASETS_MAX_ENTRIES))
+    context, cap, subject = _context(input_dataset_ids=at_cap)
     decision = start_run.decide(
         state=None,
         command=StartRun(
