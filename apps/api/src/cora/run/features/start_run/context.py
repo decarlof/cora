@@ -116,7 +116,7 @@ class RunStartContext:
     )
     """Mapping keyed by input `Dataset.id` carrying every non-Discarded
     Distribution of that Dataset (loaded by the handler via
-    `deps.dataset_distribution_lookup.find_by_dataset` for each id in
+    `deps.dataset_distribution_lookup.find_by_datasets` over
     `StartRun.input_dataset_ids`). The decider's genesis-only input gate
     requires at least one entry per declared input to be in status
     Verified; a Dataset absent from the mapping or present with no

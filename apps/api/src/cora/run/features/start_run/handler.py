@@ -47,8 +47,8 @@ gate trivially passes.
 
 If `command.input_dataset_ids` is non-empty (a reconstruction Run
 declaring its inputs), the handler invokes
-`deps.dataset_distribution_lookup.find_by_dataset(dataset_id)` for each
-declared input and threads the results into
+`deps.dataset_distribution_lookup.find_by_datasets(command.input_dataset_ids)`
+once (one grouped query, no N+1) and threads the resulting mapping into
 `RunStartContext.input_distributions`. The decider gates on at-least-one
 Verified Distribution per declared input (genesis-only). Empty
 input_dataset_ids short-circuits: no port call, decider sees an empty
@@ -67,7 +67,7 @@ versa). Started without a campaign, the handler takes the ordinary
 single-stream `append` path. See [[project_cross_bc_atomic_writes]].
 """
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from cora.campaign.aggregates.campaign import (
@@ -101,6 +101,9 @@ from cora.run.features.start_run.context import RunStartContext
 from cora.run.features.start_run.decider import decide
 from cora.shared.json_merge_patch import merge_patch
 from cora.subject.aggregates.subject import SubjectNotFoundError, load_subject
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _STREAM_TYPE = "Run"
 _CAMPAIGN_STREAM_TYPE = "Campaign"
@@ -367,19 +370,18 @@ def bind(deps: Kernel) -> Handler:
             }
 
         # cross-BC input-data snapshot for the genesis-only input gate per
-        # [[project_run_input_dependency_design]]: for every Dataset id the
+        # [[project_run_input_dependency_design]]: across the Dataset ids the
         # caller declared in command.input_dataset_ids, load every non-
-        # Discarded Distribution so the decider can require at least one
-        # Verified per declared input. Empty input_dataset_ids short-
-        # circuits the port call (ordinary acquisition Runs declare no
-        # inputs; the feature stays dormant). The lookup goes through the
-        # Data BC adapter; Run never imports cora.data.
-        input_distributions: dict[UUID, tuple[DatasetDistributionLookupResult, ...]] = {}
+        # Discarded Distribution in ONE grouped query so the decider can
+        # require at least one Verified per declared input (no N+1). Empty
+        # input_dataset_ids short-circuits the port call (ordinary
+        # acquisition Runs declare no inputs; the feature stays dormant). The
+        # lookup goes through the Data BC adapter; Run never imports cora.data.
+        input_distributions: Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]] = {}
         if command.input_dataset_ids:
-            input_distributions = {
-                dataset_id: await deps.dataset_distribution_lookup.find_by_dataset(dataset_id)
-                for dataset_id in sorted(command.input_dataset_ids, key=str)
-            }
+            input_distributions = await deps.dataset_distribution_lookup.find_by_datasets(
+                command.input_dataset_ids
+            )
 
         # BEAM-1 cross-BC beam-availability pre-flight read: ask the
         # injected lookup for the live front-end + station shutter states

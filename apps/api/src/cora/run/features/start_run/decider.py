@@ -334,7 +334,7 @@ def decide(
     # input Datasets may not start unless EACH declared input has at
     # least one Verified Distribution. The handler pre-loaded each input's
     # non-Discarded Distributions into context.input_distributions via
-    # deps.dataset_distribution_lookup.find_by_dataset; an input absent
+    # deps.dataset_distribution_lookup.find_by_datasets; an input absent
     # from the mapping (no Distribution at all) or present with no Verified
     # entry fails. This stays in the start_run decider rather than
     # check_safety_envelope precisely because it is a genesis invariant,

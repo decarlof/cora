@@ -24,6 +24,7 @@ check (which Storage Supply / tier the copy rests on); `distribution_id` is
 carried for diagnostics and the eventual lineage record.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -40,16 +41,24 @@ class DatasetDistributionLookupResult:
 
 
 class DatasetDistributionLookup(Protocol):
-    """Cross-BC port: query a Dataset's non-Discarded Distributions from the Run BC."""
+    """Cross-BC port: query Datasets' non-Discarded Distributions from the Run BC."""
 
-    async def find_by_dataset(
-        self, dataset_id: UUID
-    ) -> tuple[DatasetDistributionLookupResult, ...]:
-        """Return every non-Discarded Distribution for `dataset_id` (any status).
+    async def find_by_datasets(
+        self, dataset_ids: frozenset[UUID]
+    ) -> Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]]:
+        """Return every non-Discarded Distribution per requested Dataset id.
 
-        Empty tuple when the Dataset has no non-Discarded Distribution. The
-        decider gates on `status == "Verified"`; the port does not filter on
-        status so the decider can distinguish Stale from absent.
+        The returned mapping is keyed by Dataset id and contains ONLY the
+        ids for which at least one non-Discarded Distribution exists. Ids
+        with no non-Discarded Distribution are absent from the mapping;
+        consumers use `.get(dataset_id, ())` and treat absence as the
+        no-Distribution-at-all gate path. The port does not filter on
+        status so the decider can distinguish Stale from absent (it gates
+        on `status == "Verified"`).
+
+        Empty input (`dataset_ids = frozenset()`) returns an empty mapping;
+        the handler short-circuits before calling the port for Runs that
+        declare no input Datasets.
         """
         ...
 
@@ -61,28 +70,32 @@ class NoDatasetDistributionsLookup:
     start_run decider sees an input with no Verified Distribution and raises.
     """
 
-    async def find_by_dataset(
-        self, dataset_id: UUID
-    ) -> tuple[DatasetDistributionLookupResult, ...]:
-        _ = dataset_id
-        return ()
+    async def find_by_datasets(
+        self, dataset_ids: frozenset[UUID]
+    ) -> Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]]:
+        _ = dataset_ids
+        return {}
 
 
 class SeededDatasetDistributionLookup:
     """Test stub: returns the Distributions configured per Dataset id.
 
     Construct with a mapping `{dataset_id: (result, ...)}`; an unmapped Dataset
-    returns an empty tuple (absent). Lets a gate test seed a Verified row, a
+    is absent from the returned mapping. Lets a gate test seed a Verified row, a
     Stale-only row, or no row to exercise each decider branch.
     """
 
     def __init__(self, by_dataset: dict[UUID, tuple[DatasetDistributionLookupResult, ...]]) -> None:
         self._by_dataset = dict(by_dataset)
 
-    async def find_by_dataset(
-        self, dataset_id: UUID
-    ) -> tuple[DatasetDistributionLookupResult, ...]:
-        return self._by_dataset.get(dataset_id, ())
+    async def find_by_datasets(
+        self, dataset_ids: frozenset[UUID]
+    ) -> Mapping[UUID, tuple[DatasetDistributionLookupResult, ...]]:
+        return {
+            dataset_id: self._by_dataset[dataset_id]
+            for dataset_id in dataset_ids
+            if dataset_id in self._by_dataset
+        }
 
 
 __all__ = [

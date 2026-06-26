@@ -960,6 +960,45 @@ async def test_handler_raises_input_not_verified_with_default_lookup() -> None:
     assert exc_info.value.dataset_id == input_dataset_id
 
 
+class _RecordingDatasetDistributionLookup:
+    """Test DatasetDistributionLookup that flags any call to find_by_datasets.
+
+    Pins the dormant-by-default contract: a Run that declares no input
+    Datasets must NOT hit the lookup at all (the handler short-circuits
+    before the port call).
+    """
+
+    def __init__(self) -> None:
+        self.called = False
+
+    async def find_by_datasets(
+        self, dataset_ids: frozenset[UUID]
+    ) -> dict[UUID, tuple[DatasetDistributionLookupResult, ...]]:
+        self.called = True
+        return {}
+
+
+@pytest.mark.unit
+async def test_handler_does_not_call_distribution_lookup_when_no_inputs_declared() -> None:
+    """Dormant short-circuit: with empty input_dataset_ids the Run starts and
+    the handler never calls find_by_datasets."""
+    store = InMemoryEventStore()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    recording = _RecordingDatasetDistributionLookup()
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    deps = replace(deps, dataset_distribution_lookup=recording)
+    handler = start_run.bind(deps)
+
+    result = await handler(
+        StartRun(name="Acquire", plan_id=plan_id, subject_id=subject_id),
+        principal_id=_PRINCIPAL_ID,
+        correlation_id=_CORRELATION_ID,
+    )
+
+    assert result == _NEW_ID
+    assert recording.called is False
+
+
 # ---------- BEAM-1 beam-availability gate (handler threads the lookup) ----------
 
 

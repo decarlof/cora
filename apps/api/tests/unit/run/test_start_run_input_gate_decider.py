@@ -182,3 +182,23 @@ def test_decide_input_gate_diagnoses_first_failing_dataset_deterministically() -
     with pytest.raises(RunInputNotVerifiedError) as exc_info:
         _start(frozenset({second, first}), context, uuid4(), needs)
     assert exc_info.value.dataset_id == first
+
+
+@pytest.mark.unit
+def test_decide_raises_for_the_unsatisfied_input_when_a_peer_input_is_verified() -> None:
+    """Two declared inputs, one Verified and one Stale-only: the gate is a
+    per-input universal quantifier, so the decider raises for the UNSATISFIED
+    input even though its peer is satisfied."""
+    verified_id = UUID("00000000-0000-0000-0000-0000000000a1")
+    stale_id = UUID("00000000-0000-0000-0000-0000000000a2")
+    context, needs = _context(
+        input_distributions={
+            verified_id: (_distribution(verified_id, "Verified"),),
+            stale_id: (_distribution(stale_id, "Stale"),),
+        }
+    )
+    new_id = uuid4()
+    with pytest.raises(RunInputNotVerifiedError) as exc_info:
+        _start(frozenset({verified_id, stale_id}), context, new_id, needs)
+    assert exc_info.value.run_id == new_id
+    assert exc_info.value.dataset_id == stale_id

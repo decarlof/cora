@@ -448,7 +448,7 @@ class RunInputNotVerifiedError(Exception):
 
     Cross-BC genesis gate: when `StartRun.input_dataset_ids` is non-empty
     the handler pre-loads each input Dataset's non-Discarded Distributions
-    via `DatasetDistributionLookup.find_by_dataset` and the decider
+    via `DatasetDistributionLookup.find_by_datasets` and the decider
     requires at least ONE of them to be in status Verified. This error
     fires when a declared input Dataset has zero Verified Distributions,
     either because it has no Distribution at all or because every
