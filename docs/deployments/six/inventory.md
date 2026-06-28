@@ -18,13 +18,13 @@ Root Asset `SIX` (`tier = Unit`, `facility_code = nsls2`); sub-systems nest belo
 | `FrontEndSlit` | `Device` | Slit | 2-ID-A | front-end baffle slit (OPT-2) |
 | `PolarizationDiagnostic` | `Device` | GenericProbe | 2-ID-A | DIAGON polarization diagnostic (DIAG-1) |
 | `FrontEndShutter` / `PhotonShutter_A` | `Device` | Shutter | 2-ID-A | front-end + 2-ID-A shutters |
-| `Monochromator` | `Device` | GratingMonochromator (loose) | 2-ID-B | plane-grating mono, 3 gratings (MONO-1) |
+| `Monochromator` | `Device` | GratingMonochromator | 2-ID-B | plane-grating mono, 3 gratings (MONO-1) |
 | `MonoSlit_Upstream/Downstream` | `Device` | Slit | 2-ID-B | PGM baffle slits (OPT-2) |
 | `PhotonShutter_B` | `Device` | Shutter | 2-ID-B | 2-ID-B photon shutter |
 | `Mirror_3` / `Mirror_4` | `Device` | Mirror | 2-ID-C | hexapod refocusing mirrors (OPT-1) |
 | `MirrorSlit_3` / `MirrorSlit_4` | `Device` | Slit | 2-ID-C | refocusing-mirror slits (OPT-2) |
 | `ExitSlit` | `Device` | Slit | 2-ID-C | exit slit, sets energy resolution (OPT-2) |
-| `SampleManipulator` | `Device` | Manipulator (loose) | 2-ID-D | UHV cryostat x/y/z/theta (SAMPLE-1) |
+| `SampleManipulator` | `Device` | Manipulator | 2-ID-D | UHV cryostat x/y/z/theta (SAMPLE-1) |
 | `SampleChamber` | `Device` | LinearStage | 2-ID-D | sample-chamber pivot translation (RIXS-1) |
 | `Mirror_5` / `Mirror_6` | `Device` | Mirror | 2-ID-D | endstation mirrors (OPT-1) |
 | `MirrorMask_5` | `Device` | Aperture | 2-ID-D | single-axis mask at M5 (OPT-2) |
@@ -34,7 +34,7 @@ Root Asset `SIX` (`tier = Unit`, `facility_code = nsls2`); sub-systems nest belo
 | `DetectorSlit` | `Device` | Slit | 2-ID-D | detector-chamber slit (OPT-2) |
 | `Scaler` / `Electrometer` | `Device` | FluxMonitor | 2-ID-D | counting scaler + Femto electrometer (DET-1) |
 
-Families reused from the catalog: `InsertionDevice`, `Mirror`, `Slit`, `Shutter`, `GenericProbe`, `Aperture`, `LinearStage`, `TemperatureController`, `Camera`, `FluxMonitor`. Held loose at n=1 (new to the catalog, graduate nothing): `GratingMonochromator`, `SpectrometerArm`, `Manipulator`.
+Families reused from the catalog: `InsertionDevice`, `Mirror`, `Slit`, `Shutter`, `GenericProbe`, `Aperture`, `LinearStage`, `TemperatureController`, `Camera`, `FluxMonitor`, `GratingMonochromator` (graduated once CSX earned the soft X-ray PGM), and `Manipulator` (graduated once ESM earned the UHV sample manipulator). Held loose at n=1 (SIX only, graduate nothing): `SpectrometerArm`.
 
 ## Pending confirmations
 
