@@ -1,10 +1,21 @@
 # ESRF deployment reverse-engineering
 
-Staging notes, not published docs. These files capture what CORA can learn about the ESRF ID19
-microtomography beamline from its public controls configuration. They are inputs to later
-modeling decisions, not deployment documentation. Promote confirmed facts into descriptors
+Staging notes, not published docs. These files capture what CORA can learn about ESRF beamlines
+from their public controls configurations. They are inputs to later modeling decisions, not
+deployment documentation. Promote confirmed facts into descriptors
 (`deployments/<id>/beamline.yaml`, `catalog/catalog.yaml`) or the published
 `docs/deployments/<id>/` pages when a decision lands.
+
+Extractions to date:
+
+- `extracted/id19/` -- ID19, the long microtomography beamline (the first ESRF deployment).
+- `extracted/id16b/` -- ID16B, the nano-analysis / nano-imaging beamline (nano-tomography +
+  nano-XRF), the second ESRF deployment and the fleet's first nanoprobe on a BLISS floor.
+
+ESRF beamlines that publish a Beacon config (`<beamline>/beamline_configuration`, public on
+gitlab.esrf.fr) are the modellable set. As of 2026-06 the public ones are: ID06, ID16B, ID19,
+ID28, ID32, BM23, BM25, BM26. ID16B (nano-imaging) and ID32 (soft X-ray RIXS / XMCD) and ID28
+(IXS) are the strongest next picks after ID19.
 
 ## The source: ID19's public BLISS Beacon config
 

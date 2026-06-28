@@ -738,6 +738,19 @@ nav:
         - Techniques: deployments/id19/techniques.md
         - Governance: deployments/id19/governance.md
         - Model: deployments/id19/model.md
+      - ID16B:
+        - deployments/id16b/index.md
+        - Open questions: deployments/id16b/questions.md
+        - The beamline:
+          - deployments/id16b/equipment/index.md
+          - Source: deployments/id16b/beamline.md
+          - Sample: deployments/id16b/equipment/sample.md
+          - Detector: deployments/id16b/equipment/detector.md
+          - Controls: deployments/id16b/equipment/controls.md
+          - Inventory: deployments/id16b/inventory.md
+        - Techniques: deployments/id16b/techniques.md
+        - Governance: deployments/id16b/governance.md
+        - Model: deployments/id16b/model.md
   - Catalog:
     - catalog/index.md
     - Capabilities: catalog/capabilities.md

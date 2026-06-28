@@ -34,7 +34,7 @@ facility:
   heading: "ESRF"
   kind: Site
   institution: European Synchrotron Radiation Facility, Grenoble, France
-  beamlines: [ID19]
+  beamlines: [ID19, ID16B]
 
 # ISA-88 Site Recipes: the facility-adapted form of a catalog Method. Pending in
 # the design phase. ID19 is a microtomography beamline, so its practice adapts the
@@ -42,6 +42,11 @@ facility:
 # ID19 coins no new technique. Carried pending until ESRF staff confirm it (TECH-1).
 practices:
   - {name: ID19_microtomography_practice, method: tomography, pending: true, note: "parallel-beam hard X-ray microtomography / radiography / phase-contrast imaging on the rotation stage + Lima area detector; reuses the catalog tomography Method, a further consumer (TECH-1)"}
+  # ID16B nano-analysis / nano-imaging: nano-tomography reuses the tomography Method; nano-XRF
+  # mapping reuses the pending scanning_fluorescence_microscopy Method that 2-ID / XFM / LIX
+  # already carry (METHOD-1). Both pending until ESRF staff confirm.
+  - {name: ID16B_nanotomography_practice, method: tomography, pending: true, note: "KB-focused hard X-ray nano-tomography on the sample rotation stage + PCO / Zyla area detector; reuses the catalog tomography Method, a further consumer (TECH-1)"}
+  - {name: ID16B_scanning_fluorescence_microscopy_practice, method: scanning_fluorescence_microscopy, pending: true, note: "KB-focused nano-XRF mapping (incl. fluorescence-tomography) on the piezo raster scanner + FalconX silicon-drift detector; reuses the existing pending scanning_fluorescence_microscopy Method, a further consumer (METHOD-1)"}
 
 # Access BC Actors conceptually facility-wide at ESRF. Pending until the ESRF
 # operator and review structure is confirmed.
