@@ -4,7 +4,7 @@
 
 A deployment is a beamline pilot: one instrument where the recipe ladder, BCs, and trust boundaries meet real users. Vertical before horizontal. CORA's domain model only contains what at least one real deployment forced into it; until a beamline demands a shape, the shape stays out.
 
-A beamline is never standalone: it sits inside a Site, a Federation `Facility` that owns the clearances, principals, practices, and facility-scope supplies the beamline inherits but does not own. The deployments below are grouped by that Site; each beamline page links up to its Site rather than restating it. CORA's operational pilot is 2-BM. Most of the rest are in the design phase, modelled from a design report ahead of construction or recommissioning. The Diamond and NSLS-II beamlines, SLAC's LCLS-MFX, and the Australian Synchrotron's MX3 are a third kind: operating beamlines reverse-engineered from public controls configuration, so their pages carry real control facts but every value stays `confirm` until the beamline team verifies it.
+A beamline is never standalone: it sits inside a Site, a Federation `Facility` that owns the clearances, principals, practices, and facility-scope supplies the beamline inherits but does not own. The deployments below are grouped by that Site; each beamline page links up to its Site rather than restating it. CORA's operational pilot is 2-BM. Most of the rest are in the design phase, modelled from a design report ahead of construction or recommissioning. The Diamond and NSLS-II beamlines, SLAC's LCLS-MFX, the Australian Synchrotron's MX3, and PSI's Alvra, Bernina, and Cristallina are a third kind: operating beamlines reverse-engineered from public controls configuration, so their pages carry real control facts but every value stays `confirm` until the beamline team verifies it.
 
 ## [APS](aps/index.md)
 
@@ -88,6 +88,17 @@ The sixth Site CORA models, and its first Australian facility (operated by ANSTO
 | --- | --- | --- |
 | [MX3](mx3/index.md) | Reverse-engineered | macromolecular crystallography (rotation MX) on an MD3 microdiffractometer + DECTRIS Eiger with an ISARA robot; reuses the i03 Goniometer and MX Methods, novelty is the Site and its heterogeneous control plane |
 
+## [PSI](psi/index.md)
+
+CORA's eighth Site (the Paul Scherrer Institut). Like SLAC, the Site is the institute: PSI hosts two photon sources, the Swiss Light Source (SLS / SLS 2.0) storage ring and SwissFEL, with the beamlines as stations under it. The I-TOMCAT beamline (on SLS) is a hybrid modelled from PSI's public beamline pages and the SLS 2.0 design reports (the TomoWise tradition), because no public per-beamline controls config exists for TOMCAT; SLS is an EPICS facility with the BEC scan layer over ophyd, the seam CORA's edge would replace. The three SwissFEL Aramis stations make PSI CORA's second X-ray free-electron laser after SLAC, reverse-engineered from PSI's own controls libraries to re-test the XFEL findings against an independently-built FEL: LCLS-MFX was mined from SLAC's `pcdshub`, the Aramis stations from `eco` / `slic`. Alvra confirms the family-fold and acquisition-gap findings from an independent control stack; Bernina makes the shared-switched-source seam (TOPO-1) concrete, as the second co-equal station on the one Aramis source, and reaches the same gaps through diffraction; Cristallina closes the Aramis triad as the third station, is the first deployment mined from the `slic` library (eco's successor, on gitea.psi.ch) rather than `eco`, and adds a dilution-fridge vector-magnet sample environment. No PSI station coins a new Family.
+
+| Beamline | Status | What it is |
+| --- | --- | --- |
+| [I-TOMCAT](i-tomcat/index.md) | Reverse-engineered | insertion-device tomographic microscopy (absorption + propagation phase contrast + dynamic 4D CT on the PSI GigaFRoST camera), X02SA; the SLS 2.0 undulator half of the rebuilt TOMCAT, CORA's micro-CT analog of APS 2-BM |
+| [Alvra](alvra/index.md) | Reverse-engineered | hard X-ray femtosecond pump-probe (time-resolved XAS / XES / HERFD and serial crystallography) on the SwissFEL Aramis branch; CORA's second XFEL, reinforcing the LCLS-MFX family-fold and acquisition-gap findings from an independent control stack (`eco`) |
+| [Bernina](bernina/index.md) | Reverse-engineered (partial) | hard X-ray femtosecond pump-probe diffraction / scattering on two reconfigurable diffractometers (GPS six-circle, XRD You-geometry); the second co-equal station on the shared Aramis source, makes the shared-switched-source seam concrete, reuses the graduated Diffractometer Assembly; a deliberately partial first cut (`eco`), the live device config is externalized |
+| [Cristallina](cristallina/index.md) | Reverse-engineered | hard X-ray time-resolved diffraction / scattering on quantum materials (DM1 / DM2 diffractometers in a dilution-fridge vector superconducting magnet) plus serial crystallography; the third Aramis station, closes the shared-source triad, CORA's first deployment mined from `slic`, fourth `Magnet` consumer (held), no new Family |
+
 ## [Sirius](sirius/index.md)
 
 CORA's first South American facility (the Brazilian Synchrotron Light Laboratory, LNLS, at CNPEM in Campinas). Its MOGNO beamline is reverse-engineered from two published papers and the public facility page rather than an open controls config, so it is the thinnest reverse-engineered scaffold: device families are inferred but no control handles or vendor models are public, and every value stays `confirm` until MOGNO staff verify it.
@@ -95,13 +106,5 @@ CORA's first South American facility (the Brazilian Synchrotron Light Laboratory
 | Beamline | Status | What it is |
 | --- | --- | --- |
 | [MOGNO](mogno/index.md) | Reverse-engineered (partial) | cone-beam X-ray micro and nanotomography (phase-contrast, time-resolved 4D) across two stations; reuses the 2-BM / FXI tomography vocabulary, novelty is the Site and the fleet's first custom-Python (non-Bluesky) orchestration layer |
-
-## [PSI](psi/index.md)
-
-The Paul Scherrer Institut. Like SLAC, the Site is the institute: PSI hosts two photon sources, the Swiss Light Source (SLS / SLS 2.0) storage ring and SwissFEL, with the beamlines as stations under it. Its I-TOMCAT beamline (on SLS) is a hybrid: the tomography instrument is modelled from PSI's public beamline pages and the SLS 2.0 design reports (the TomoWise tradition), because no public per-beamline controls config exists for TOMCAT. The public `bec-project/ophyd_devices` examples show the SLS PV-prefix shape (for sibling beamlines cSAXS and PXIII), and SLS is an EPICS facility with the BEC scan layer over ophyd, which is the seam CORA's edge would replace.
-
-| Beamline | Status | What it is |
-| --- | --- | --- |
-| [I-TOMCAT](i-tomcat/index.md) | Reverse-engineered | insertion-device tomographic microscopy (absorption + propagation phase contrast + dynamic 4D CT on the PSI GigaFRoST camera), X02SA; the SLS 2.0 undulator half of the rebuilt TOMCAT, CORA's micro-CT analog of APS 2-BM |
 
 Cross-facility vocabulary (Capabilities, Methods) lives in the [Catalog](../catalog/index.md), since it is not bound to any single Site.
