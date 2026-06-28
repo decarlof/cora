@@ -94,6 +94,7 @@ from cora.infrastructure.ports import (
     ClearanceLookup,
     ClearanceTemplateLookup,
     Clock,
+    ComputeReachabilityLookup,
     CredentialLookup,
     DatasetDistributionLookup,
     EnclosureLookup,
@@ -103,6 +104,7 @@ from cora.infrastructure.ports import (
     IdempotencyStore,
     IdGenerator,
     LogbookMirror,
+    NoComputeReachabilityLookup,
     NoDatasetDistributionsLookup,
     ProfileStore,
     RoleLookup,
@@ -163,6 +165,7 @@ def make_postgres_kernel(
     capability_lookup: CapabilityLookup | None = None,
     supply_lookup: SupplyLookup | None = None,
     dataset_distribution_lookup: DatasetDistributionLookup | None = None,
+    compute_reachability_lookup: ComputeReachabilityLookup | None = None,
     credential_lookup: CredentialLookup | None = None,
     facility_lookup: FacilityLookup | None = None,
     asset_lookup: AssetLookup | None = None,
@@ -231,6 +234,14 @@ def make_postgres_kernel(
     `dataset_distribution_lookup_factory` argument; gate-specific tests
     override here with `SeededDatasetDistributionLookup`. See
     [[project_run_input_dependency_design]].
+
+    `compute_reachability_lookup` defaults to `NoComputeReachabilityLookup`
+    (every code unknown): the conservative default for the reachability arm
+    of the input gate, so a Run naming a compute resource fails with
+    `RunComputeResourceUnknownError` unless seeded. The production adapter is
+    deferred; gate-specific tests override here with
+    `SeededComputeReachabilityLookup`. Runs naming no compute resource never
+    call the lookup, so the arm is dormant.
 
     `credential_lookup` defaults to a fresh `InMemoryCredentialLookup`
     (empty record map). Seal handler / decider tests seed credentials
@@ -316,6 +327,11 @@ def make_postgres_kernel(
             if dataset_distribution_lookup is not None
             else NoDatasetDistributionsLookup()
         ),
+        compute_reachability_lookup=(
+            compute_reachability_lookup
+            if compute_reachability_lookup is not None
+            else NoComputeReachabilityLookup()
+        ),
         credential_lookup=(
             credential_lookup if credential_lookup is not None else InMemoryCredentialLookup()
         ),
@@ -359,6 +375,7 @@ def make_inmemory_kernel(
     capability_lookup: CapabilityLookup | None = None,
     supply_lookup: SupplyLookup | None = None,
     dataset_distribution_lookup: DatasetDistributionLookup | None = None,
+    compute_reachability_lookup: ComputeReachabilityLookup | None = None,
     credential_lookup: CredentialLookup | None = None,
     facility_lookup: FacilityLookup | None = None,
     asset_lookup: AssetLookup | None = None,
@@ -418,6 +435,14 @@ def make_inmemory_kernel(
     an input fails the genesis input gate unless the test overrides with
     `SeededDatasetDistributionLookup`. Ordinary Runs declare no inputs,
     so the gate is dormant. See [[project_run_input_dependency_design]].
+
+    `compute_reachability_lookup` defaults to `NoComputeReachabilityLookup`
+    (every code unknown): the conservative default for the reachability arm
+    of the input gate. A Run naming a compute resource fails with
+    `RunComputeResourceUnknownError` unless the test overrides with
+    `SeededComputeReachabilityLookup`. Runs naming no compute resource never
+    call the lookup, so the arm is dormant. The production adapter (a
+    deployment-config map resolved by Supply name) is deferred.
 
     `credential_lookup` defaults to a fresh `InMemoryCredentialLookup`
     for the same reason: no projection worker, no
@@ -496,6 +521,11 @@ def make_inmemory_kernel(
             dataset_distribution_lookup
             if dataset_distribution_lookup is not None
             else NoDatasetDistributionsLookup()
+        ),
+        compute_reachability_lookup=(
+            compute_reachability_lookup
+            if compute_reachability_lookup is not None
+            else NoComputeReachabilityLookup()
         ),
         credential_lookup=(
             credential_lookup if credential_lookup is not None else InMemoryCredentialLookup()

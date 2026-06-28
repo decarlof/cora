@@ -55,6 +55,22 @@ input_dataset_ids short-circuits: no port call, decider sees an empty
 mapping, gate trivially passes. See
 [[project_run_input_dependency_design]].
 
+## Reachability resolution (compute_resource_code)
+
+If `command.compute_resource_code` is non-None (the reconstruction names a
+remote compute resource that can only read certain Storage tiers), the
+handler resolves it via
+`deps.compute_reachability_lookup.reachable_storage_supply_ids(code)` and
+threads the result into `RunStartContext.reachable_storage_supply_ids`. A
+None return means the code is unknown (not configured): the handler raises
+`RunComputeResourceUnknownError` rather than skip the check (this unknown-
+code outcome is an I/O resolution, so it lives here, not in the pure
+decider). When compute_resource_code is None the handler does not call the
+lookup and leaves reachable_storage_supply_ids=None, so the decider skips
+reachability and gates present-and-Verified only. compute_resource_code is
+consumed only by the gate and is NOT persisted on RunStarted (mirrors the
+beam reading).
+
 ## Atomic co-write when started into a campaign
 
 If `command.campaign_id` is set, the new Run's genesis events AND the
@@ -94,7 +110,11 @@ from cora.infrastructure.routing import NIL_SENTINEL_ID
 from cora.recipe.aggregates.method import MethodNotFoundError, load_method
 from cora.recipe.aggregates.plan import PlanNotFoundError, load_plan
 from cora.recipe.aggregates.practice import PracticeNotFoundError, load_practice
-from cora.run.aggregates.run import event_type_name, to_payload
+from cora.run.aggregates.run import (
+    RunComputeResourceUnknownError,
+    event_type_name,
+    to_payload,
+)
 from cora.run.errors import UnauthorizedError
 from cora.run.features.start_run.command import StartRun
 from cora.run.features.start_run.context import RunStartContext
@@ -383,6 +403,31 @@ def bind(deps: Kernel) -> Handler:
                 command.input_dataset_ids
             )
 
+        # reachability resolution arm of the input gate: when the caller
+        # named a remote compute resource, resolve it to the set of Storage
+        # tiers that resource can read so the decider can require each input's
+        # Verified Distribution to sit on a reachable tier. A None return means
+        # the code is UNKNOWN (not in the deployment reachability map): surface
+        # the typo here as RunComputeResourceUnknownError rather than silently
+        # skipping the check. When compute_resource_code is None, do NOT call
+        # the lookup and leave reachable_storage_supply_ids=None (skip the
+        # reachability check, present-and-Verified behavior). This is an
+        # I/O-resolution outcome, so it lives in the handler, not the pure
+        # decider; the decider gates on the resolved frozenset only.
+        # compute_resource_code is consumed only by the gate and is NOT
+        # persisted on RunStarted (mirrors the beam reading).
+        reachable_storage_supply_ids: frozenset[UUID] | None = None
+        if command.compute_resource_code is not None:
+            reachable_storage_supply_ids = (
+                await deps.compute_reachability_lookup.reachable_storage_supply_ids(
+                    command.compute_resource_code
+                )
+            )
+            if reachable_storage_supply_ids is None:
+                raise RunComputeResourceUnknownError(
+                    run_id=new_id, compute_resource_code=command.compute_resource_code
+                )
+
         # BEAM-1 cross-BC beam-availability pre-flight read: ask the
         # injected lookup for the live front-end + station shutter states
         # and the ACIS FES-permit composite at the start instant. The
@@ -402,6 +447,7 @@ def bind(deps: Kernel) -> Handler:
             active_cautions=active_cautions,
             needed_supplies_satisfaction=needed_supplies_satisfaction,
             input_distributions=input_distributions,
+            reachable_storage_supply_ids=reachable_storage_supply_ids,
             referencing_enclosures=referencing_enclosures,
             campaign=campaign,
             beam_availability=beam_availability,

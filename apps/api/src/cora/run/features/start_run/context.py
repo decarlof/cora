@@ -122,9 +122,27 @@ class RunStartContext:
     Verified; a Dataset absent from the mapping or present with no
     Verified entry raises `RunInputNotVerifiedError`. Empty mapping is
     the natural state for ordinary acquisition Runs that declare no
-    inputs (the handler skips the lookup entirely). Reachability and
-    storage-tier are deferred; the gate is present-and-Verified only per
-    [[project_run_input_dependency_design]]."""
+    inputs (the handler skips the lookup entirely)."""
+    reachable_storage_supply_ids: frozenset[UUID] | None = None
+    """The Storage Supply ids the Run's chosen compute resource can read,
+    resolved by the handler from `StartRun.compute_resource_code` via
+    `deps.compute_reachability_lookup.reachable_storage_supply_ids`.
+
+    Tri-state, and the decider's reachability gate keys on it:
+      - None: skip reachability (no remote-compute target declared, or the
+        deployment configures no reachability map). The gate stays
+        present-and-Verified only, today's behavior.
+      - empty frozenset(): the resource can read NO Storage tier, so EVERY
+        input is unreachable. Each input with a Verified Distribution still
+        FAILS the reachability check (fail-closed).
+      - non-empty frozenset: intersect. An input passes only when at least
+        one of its Verified Distributions sits on a `supply_id` in this set;
+        otherwise the decider raises `RunInputNotReachableError`.
+
+    The reachability check runs only AFTER the present-and-Verified check
+    per input (NotVerified beats NotReachable). `compute_resource_code` is
+    consumed only by this gate and is intentionally NOT persisted on
+    `RunStarted` (mirrors the beam reading)."""
     referencing_enclosures: tuple[EnclosureLookupResult, ...] = ()
     """Every Active Enclosure that any of the Run's scoped Assets (or
     their ancestors) declares as its `located_in_enclosure_id`. The

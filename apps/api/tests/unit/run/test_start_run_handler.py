@@ -35,6 +35,9 @@ from cora.equipment.aggregates.asset.events import (
 from cora.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from cora.infrastructure.event_envelope import to_new_event
 from cora.infrastructure.ports.beam_availability_lookup import BeamAvailabilityLookupResult
+from cora.infrastructure.ports.compute_reachability_lookup import (
+    SeededComputeReachabilityLookup,
+)
 from cora.infrastructure.ports.dataset_distribution_lookup import (
     DatasetDistributionLookupResult,
     SeededDatasetDistributionLookup,
@@ -64,6 +67,7 @@ from cora.run.aggregates.run import (
     RunBeamAvailabilityUnknownError,
     RunBoundPlanDeprecatedError,
     RunCapabilitiesNotSatisfiedError,
+    RunComputeResourceUnknownError,
     RunInputNotVerifiedError,
     RunPlanAssetDecommissionedError,
     RunRequiresOpenBeamShuttersError,
@@ -987,6 +991,126 @@ async def test_handler_does_not_call_distribution_lookup_when_no_inputs_declared
     recording = _RecordingDatasetDistributionLookup()
     deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
     deps = replace(deps, dataset_distribution_lookup=recording)
+    handler = start_run.bind(deps)
+
+    result = await handler(
+        StartRun(name="Acquire", plan_id=plan_id, subject_id=subject_id),
+        principal_id=_PRINCIPAL_ID,
+        correlation_id=_CORRELATION_ID,
+    )
+
+    assert result == _NEW_ID
+    assert recording.called is False
+
+
+# ---------- Reachability arm of the input gate (handler resolves the code) ----------
+
+
+@pytest.mark.unit
+async def test_handler_starts_when_compute_resource_can_read_the_verified_tier() -> None:
+    """compute_resource_code resolves to a tier set containing the input's
+    Verified supply_id: the reconstruction Run starts. Proves the handler
+    resolves the code via deps.compute_reachability_lookup and threads the
+    set into the decider."""
+    store = InMemoryEventStore()
+    input_dataset_id = uuid4()
+    reachable_tier = uuid4()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    deps = replace(
+        deps,
+        dataset_distribution_lookup=SeededDatasetDistributionLookup(
+            {
+                input_dataset_id: (
+                    DatasetDistributionLookupResult(
+                        distribution_id=uuid4(),
+                        dataset_id=input_dataset_id,
+                        supply_id=reachable_tier,
+                        status="Verified",
+                    ),
+                )
+            }
+        ),
+        compute_reachability_lookup=SeededComputeReachabilityLookup(
+            {"polaris": frozenset({reachable_tier})}
+        ),
+    )
+    handler = start_run.bind(deps)
+
+    result = await handler(
+        StartRun(
+            name="Reconstruct",
+            plan_id=plan_id,
+            subject_id=subject_id,
+            input_dataset_ids=frozenset({input_dataset_id}),
+            compute_resource_code="polaris",
+        ),
+        principal_id=_PRINCIPAL_ID,
+        correlation_id=_CORRELATION_ID,
+    )
+    assert result == _NEW_ID
+
+
+@pytest.mark.unit
+async def test_handler_raises_compute_resource_unknown_for_unmapped_code() -> None:
+    """An unmapped compute_resource_code (the default NoComputeReachabilityLookup,
+    or a Seeded lookup without the key) -> RunComputeResourceUnknownError
+    raised in the handler, before the decider sees the context."""
+    store = InMemoryEventStore()
+    input_dataset_id = uuid4()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    deps = replace(
+        deps,
+        compute_reachability_lookup=SeededComputeReachabilityLookup(
+            {"polaris": frozenset({uuid4()})}
+        ),
+    )
+    handler = start_run.bind(deps)
+
+    with pytest.raises(RunComputeResourceUnknownError) as exc_info:
+        await handler(
+            StartRun(
+                name="Reconstruct",
+                plan_id=plan_id,
+                subject_id=subject_id,
+                input_dataset_ids=frozenset({input_dataset_id}),
+                compute_resource_code="unconfigured",
+            ),
+            principal_id=_PRINCIPAL_ID,
+            correlation_id=_CORRELATION_ID,
+        )
+    assert exc_info.value.compute_resource_code == "unconfigured"
+
+
+class _RecordingComputeReachabilityLookup:
+    """Test ComputeReachabilityLookup that flags any call.
+
+    Pins the dormant-by-default contract: a Run that names no
+    compute_resource_code must NOT hit the lookup at all.
+    """
+
+    def __init__(self) -> None:
+        self.called = False
+
+    async def reachable_storage_supply_ids(
+        self, compute_resource_code: str
+    ) -> frozenset[UUID] | None:
+        _ = compute_resource_code
+        self.called = True
+        return None
+
+
+@pytest.mark.unit
+async def test_handler_does_not_call_reachability_lookup_when_no_code_declared() -> None:
+    """Dormant short-circuit: compute_resource_code=None means the handler
+    never calls reachable_storage_supply_ids and present-and-Verified
+    behavior is unchanged."""
+    store = InMemoryEventStore()
+    _, _, _, _, plan_id, subject_id = await seed_full_chain(store)
+    recording = _RecordingComputeReachabilityLookup()
+    deps = build_deps(ids=[_NEW_ID, _EVENT_ID], now=_NOW, event_store=store)
+    deps = replace(deps, compute_reachability_lookup=recording)
     handler = start_run.bind(deps)
 
     result = await handler(

@@ -93,6 +93,7 @@ from cora.run.aggregates.run import (
     RunBoundPlanDeprecatedError,
     RunCannotJoinCampaignError,
     RunCapabilitiesNotSatisfiedError,
+    RunInputNotReachableError,
     RunInputNotVerifiedError,
     RunName,
     RunPlanAssetDecommissionedError,
@@ -183,6 +184,14 @@ def decide(
       - Every declared input Dataset (command.input_dataset_ids) must
         have at least one Verified Distribution (genesis-only; NOT
         re-run on resume) -> RunInputNotVerifiedError
+      - When context.reachable_storage_supply_ids is not None (a remote
+        compute resource was named and resolved), every declared input
+        Dataset must additionally have at least one Verified Distribution
+        whose supply_id is in that set -> RunInputNotReachableError.
+        None skips the reachability check (present-and-Verified only); an
+        empty set fails every input with a Verified copy (fail-closed);
+        a non-empty set intersects. NotVerified is checked first and takes
+        precedence over NotReachable
       - Effective parameters must validate against Method's
         parameters_schema (STRICT when schema is None; non-empty
         effective rejected)
@@ -339,16 +348,29 @@ def decide(
     # entry fails. This stays in the start_run decider rather than
     # check_safety_envelope precisely because it is a genesis invariant,
     # not a live-signal gate: a held Run's resume re-check shares the
-    # envelope and must NOT re-run this. Reachability and storage-tier are
-    # deferred; gate on present-and-Verified only per
-    # [[project_run_input_dependency_design]]. Empty input_dataset_ids
-    # makes the loop dormant (no lookup, gate passes trivially).
-    # "Verified" is the DistributionStatus.VERIFIED wire value (Run may
-    # not import cora.data.aggregates per the tach contract).
+    # envelope and must NOT re-run this. Empty input_dataset_ids makes the
+    # loop dormant (no lookup, gate passes trivially). "Verified" is the
+    # DistributionStatus.VERIFIED wire value (Run may not import
+    # cora.data.aggregates per the tach contract). compute_resource_code is
+    # consumed only by this gate and is NOT persisted on RunStarted (mirrors
+    # the beam reading). Per-input precedence (gate-review lock):
+    #   1. present-and-Verified: no Verified Distribution at all
+    #      -> RunInputNotVerifiedError (always checked first).
+    #   2. reachability: ONLY when context.reachable_storage_supply_ids is
+    #      not None, require a Verified Distribution whose supply_id is in
+    #      that set -> RunInputNotReachableError. None skips the check
+    #      (present-and-Verified behavior); an empty set fails every input
+    #      with a Verified copy (the resource reads no tier, fail-closed); a
+    #      non-empty set intersects. NotVerified beats NotReachable.
+    reachable = context.reachable_storage_supply_ids
     for dataset_id in sorted(input_dataset_ids, key=str):
         distributions = context.input_distributions.get(dataset_id, ())
         if not any(d.status == "Verified" for d in distributions):
             raise RunInputNotVerifiedError(run_id=new_id, dataset_id=dataset_id)
+        if reachable is not None and not any(
+            d.status == "Verified" and d.supply_id in reachable for d in distributions
+        ):
+            raise RunInputNotReachableError(run_id=new_id, dataset_id=dataset_id)
 
     # build the acknowledged_cautions snapshot for the
     # RunStarted event payload. Per the Caution design memo, this

@@ -37,7 +37,8 @@ InvalidRunInterruptedAtError).
   - 409 (Run-start supply pre-flight gate):
     RunRequiresAvailableSupplyError, RunSupplyCoverageMismatchError
   - 409 (Run-start input-data genesis gate):
-    RunInputNotVerifiedError
+    RunInputNotVerifiedError, RunInputNotReachableError,
+    RunComputeResourceUnknownError
   - 409 (Run transition guards, 6f-2): RunCannotCompleteError,
     RunCannotAbortError
   - 409 (Run transition guards, 6f-3): RunCannotHoldError,
@@ -84,7 +85,9 @@ from cora.run.aggregates.run import (
     RunCannotTruncateError,
     RunCapabilitiesNotSatisfiedError,
     RunClearanceCoverageMismatchError,
+    RunComputeResourceUnknownError,
     RunEnclosureCoverageMismatchError,
+    RunInputNotReachableError,
     RunInputNotVerifiedError,
     RunNotFoundError,
     RunObservationLogbookClosedError,
@@ -232,8 +235,12 @@ def register_run_routes(app: FastAPI) -> None:
         RunRequiresOpenBeamShuttersError,
         RunBeamAvailabilityUnknownError,
         # Run-start input-data genesis gate: a declared input Dataset
-        # has no Verified Distribution.
+        # has no Verified Distribution; or its Verified copy is not on a
+        # Storage tier the chosen compute resource can read; or the named
+        # compute resource is not configured in the reachability map.
         RunInputNotVerifiedError,
+        RunInputNotReachableError,
+        RunComputeResourceUnknownError,
         # Run-start campaign-membership gate (6i-c).
         RunCannotJoinCampaignError,
         # Run-side campaign-membership invariant (6i-c).

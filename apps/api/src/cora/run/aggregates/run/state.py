@@ -470,6 +470,65 @@ class RunInputNotVerifiedError(Exception):
         self.dataset_id = dataset_id
 
 
+class RunInputNotReachableError(Exception):
+    """A reconstruction Run's input Dataset has a Verified Distribution, but
+    none of its Verified copies sits on a Storage tier the chosen compute
+    resource can read.
+
+    Cross-BC genesis gate, reachability arm: when `StartRun.compute_resource_code`
+    is supplied the handler resolves it to the set of readable Storage Supply
+    ids via `ComputeReachabilityLookup` and threads it onto
+    `RunStartContext.reachable_storage_supply_ids`. The decider then requires,
+    per declared input, at least one Verified Distribution whose `supply_id`
+    is in that set. This error fires when the input clears the
+    present-and-Verified check (it HAS a Verified Distribution) yet every
+    Verified copy rests on an unreachable tier.
+
+    Distinct from `RunInputNotVerifiedError` (no Verified Distribution at
+    all, which is checked first and takes precedence) and from
+    `RunComputeResourceUnknownError` (the named compute resource is not
+    configured, a typo rather than a data problem). Mapped to HTTP 409.
+    """
+
+    def __init__(self, run_id: UUID, dataset_id: UUID) -> None:
+        super().__init__(
+            f"Run {run_id} cannot start: input Dataset {dataset_id} has a "
+            f"Verified Distribution, but no Verified copy is on a Storage tier "
+            f"the chosen compute resource can read. Stage a Verified copy on a "
+            f"reachable tier before starting the reconstruction."
+        )
+        self.run_id = run_id
+        self.dataset_id = dataset_id
+
+
+class RunComputeResourceUnknownError(Exception):
+    """StartRun named a compute_resource_code the deployment config does not
+    map to any readable-storage set.
+
+    Cross-BC genesis gate, resolution arm: when `StartRun.compute_resource_code`
+    is supplied the handler calls
+    `ComputeReachabilityLookup.reachable_storage_supply_ids(code)`; a None
+    return means the code is unknown (not configured). The handler raises
+    this rather than silently skipping the reachability check, so a typo in
+    the compute resource name surfaces as an actionable error instead of an
+    unchecked start.
+
+    Distinct from `RunInputNotReachableError` (the code IS configured but
+    no input rests on a reachable tier, a genuine data problem). This error
+    is a configuration typo. Mapped to HTTP 409.
+    """
+
+    def __init__(self, run_id: UUID, compute_resource_code: str) -> None:
+        super().__init__(
+            f"Run {run_id} cannot start: compute resource {compute_resource_code!r} "
+            f"is not configured in the deployment reachability map. Check the "
+            f"compute_resource_code for a typo, or configure the resource's "
+            f"readable Storage tiers before starting the reconstruction."
+        )
+        self.run_id = run_id
+        self.compute_resource_code = compute_resource_code
+
+
 class RunClearanceCoverageMismatchError(Exception):
     """Clearances reference this Run's scope but none are Active.
 

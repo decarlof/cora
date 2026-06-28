@@ -46,6 +46,11 @@ from cora.infrastructure.ports.clearance_template_lookup import (
     ClearanceTemplateLookupResult,
 )
 from cora.infrastructure.ports.clock import Clock, FakeClock, SystemClock
+from cora.infrastructure.ports.compute_reachability_lookup import (
+    ComputeReachabilityLookup,
+    NoComputeReachabilityLookup,
+    SeededComputeReachabilityLookup,
+)
 from cora.infrastructure.ports.credential_lookup import (
     CredentialLookup,
     CredentialLookupResult,
@@ -181,6 +186,7 @@ __all__ = [
     "ClearanceTemplateLookup",
     "ClearanceTemplateLookupResult",
     "Clock",
+    "ComputeReachabilityLookup",
     "ConcurrencyError",
     "CredentialLookup",
     "CredentialLookupResult",
@@ -225,6 +231,7 @@ __all__ = [
     "MinSeverity",
     "ModelRef",
     "NewEvent",
+    "NoComputeReachabilityLookup",
     "NoDatasetDistributionsLookup",
     "NoSuppliesRegisteredLookup",
     "NullInferenceRecorder",
@@ -233,6 +240,7 @@ __all__ = [
     "ProfileStore",
     "RoleLookup",
     "RoleLookupResult",
+    "SeededComputeReachabilityLookup",
     "SeededDatasetDistributionLookup",
     "Signer",
     "SignerKeyInactiveError",
