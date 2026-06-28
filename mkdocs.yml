@@ -723,6 +723,21 @@ nav:
         - Techniques: deployments/mx3/techniques.md
         - Governance: deployments/mx3/governance.md
         - Model: deployments/mx3/model.md
+    - ESRF:
+      - deployments/esrf/index.md
+      - ID19:
+        - deployments/id19/index.md
+        - Open questions: deployments/id19/questions.md
+        - The beamline:
+          - deployments/id19/equipment/index.md
+          - Source: deployments/id19/beamline.md
+          - Sample: deployments/id19/equipment/sample.md
+          - Detector: deployments/id19/equipment/detector.md
+          - Controls: deployments/id19/equipment/controls.md
+          - Inventory: deployments/id19/inventory.md
+        - Techniques: deployments/id19/techniques.md
+        - Governance: deployments/id19/governance.md
+        - Model: deployments/id19/model.md
   - Catalog:
     - catalog/index.md
     - Capabilities: catalog/capabilities.md

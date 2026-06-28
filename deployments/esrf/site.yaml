@@ -1,0 +1,68 @@
+# CORA Site descriptor: the ESRF site-level surface
+#
+# The European Synchrotron Radiation Facility (Grenoble, France) is the seventh
+# Site CORA models, and the home of the ID19 microtomography beamline scaffold.
+# This file is the single human-readable source for the facility's site-level
+# instances: the Facility itself, the Practices it would run, and the facility
+# principals.
+#
+# Status: ESRF / ID19 is a reverse-engineered, design-phase modelling exercise,
+# and a deliberate off-roadmap pick. ID19 is a real, operating hard X-ray
+# microtomography beamline, but it is NOT on the CORA pilot roadmap
+# (APS -> MAX IV); it is modelled here for one reason: ESRF runs BLISS (a
+# Tango-based control system), not EPICS, so ID19 is CORA's FIRST live, non-EPICS,
+# BLISS/Tango control floor. The whole fleet to date is an EPICS monoculture
+# (ophyd / bluesky / dodal / pcdshub), and the one prior non-EPICS model (MAX IV
+# TomoWise, Tango/Sardana) is design-phase only. ID19 tests that the seam model,
+# which today bakes in "EPICS is the floor", generalizes to a different floor.
+# The technique is pure tomography reuse (zero device-family invention); the only
+# new axis is the control plane. Almost everything below is design-phase intent
+# carried as `pending`, not an operating fact. Concrete facility details (safety
+# forms, supply names, the operator pool) are deferred to the ID19 open questions
+# until ESRF staff confirm them. Do not invent facility specifics here; carry them
+# as questions.
+#
+# Source-of-truth boundary (same as the APS, MAX IV, and Diamond sites):
+#   - the closed facility-kind / actor-kind vocabularies are validated against
+#     code-mirrored frozensets in scripts/site_descriptor.py.
+#   - the facility records the bootstrap invariants (kind=Site, display_name
+#     equals code); `heading` carries the human title used on the rendered page.
+
+facility:
+  code: esrf
+  display_name: esrf
+  heading: "ESRF"
+  kind: Site
+  institution: European Synchrotron Radiation Facility, Grenoble, France
+  beamlines: [ID19]
+
+# ISA-88 Site Recipes: the facility-adapted form of a catalog Method. Pending in
+# the design phase. ID19 is a microtomography beamline, so its practice adapts the
+# existing `tomography` Method (the same the 2-BM pilot and MAX IV TomoWise carry);
+# ID19 coins no new technique. Carried pending until ESRF staff confirm it (TECH-1).
+practices:
+  - {name: ID19_microtomography_practice, method: tomography, pending: true, note: "parallel-beam hard X-ray microtomography / radiography / phase-contrast imaging on the rotation stage + Lima area detector; reuses the catalog tomography Method, a further consumer (TECH-1)"}
+
+# Access BC Actors conceptually facility-wide at ESRF. Pending until the ESRF
+# operator and review structure is confirmed.
+actors:
+  - {name: ESRF beamline staff, kind: human, pending: true, note: "ID19 operator and beamline-scientist pool; structure TBD"}
+  - {name: ESRF safety review, kind: human, pending: true, note: "facility safety review body; membership TBD"}
+
+# Agent BC Agents seeded at this deployment. None declared: the CORA system agents
+# are not yet wired for an ESRF deployment, and ID19 is a scaffold.
+agents: []
+
+# Supply BC: facility-wide continuously-available resources. Pending in design.
+supplies:
+  - {name: Storage-ring beam current, kind: PhotonBeam, pending: true}
+  - {name: Cooling water, kind: CoolingWater, pending: true}
+  - {name: Beamline vacuum, kind: Vacuum, pending: true}
+
+# Safety BC: facility-issued Clearances. ESRF PSS form names are not yet confirmed;
+# carried pending with a note rather than guessed (PSS-1).
+clearances:
+  - {name: ESRF personnel safety system, kind: PSS, pending: true, note: "facility safety-form names TBD; confirm with ESRF staff (PSS-1)"}
+
+# Caution BC: operator tribal knowledge. None yet for a scaffold deployment.
+cautions: []
