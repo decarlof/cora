@@ -21,7 +21,7 @@ tuple loops to register them. New aggregates and transition errors
 append entries without restructuring.
 
   - 400 (validation): InvalidMethodNameError, InvalidMethodParametersSchemaError,
-    InvalidMethodNeededSuppliesError
+    InvalidMethodNeededSuppliesError, InvalidMethodNeededInputKindsError
   - 404 (load miss): MethodNotFoundError
   - 409 (defensive guard for AlreadyExists): MethodAlreadyExistsError
   - 409 (transition guards): future <Aggregate>Cannot<Verb>Error families
@@ -48,6 +48,7 @@ from cora.recipe.aggregates.method import (
     InvalidMethodIterativeStoppingFieldError,
     InvalidMethodMonotoneQualityError,
     InvalidMethodNameError,
+    InvalidMethodNeededInputKindsError,
     InvalidMethodNeededSuppliesError,
     InvalidMethodParametersSchemaError,
     InvalidMethodVersionTagError,
@@ -289,6 +290,7 @@ def register_recipe_routes(app: FastAPI) -> None:
         InvalidCapabilityVersionTagError,
         InvalidExecutorShapesError,
         InvalidMethodNameError,
+        InvalidMethodNeededInputKindsError,
         InvalidMethodNeededSuppliesError,
         InvalidMethodParametersSchemaError,
         InvalidMethodVersionTagError,

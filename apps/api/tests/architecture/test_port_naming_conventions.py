@@ -57,6 +57,11 @@ _PORT_SUFFIX_ALLOWLIST: dict[str, str] = {
         "graceful role noun 'JobRunner' is reserved for the multi-substrate "
         "registry hoist, so it stays ComputePort (sibling of ControlPort)"
     ),
+    "TransferPort": (
+        "data-movement seam; 'Transfer' is a bare verb and the graceful agent "
+        "noun ('Mover' / 'Courier') reads worse than the bare-verb sibling pair, "
+        "so it stays TransferPort (sibling of ControlPort / ComputePort)"
+    ),
     "DecidePort": (
         "decide seam (sibling of ControlPort/ComputePort); 'Decide' is a bare "
         "verb and the graceful agent noun 'Decider' is reserved for the deferred "
