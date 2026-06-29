@@ -118,7 +118,7 @@ CORA's Site for the ALBA Synchrotron (Barcelona, Spain), and its second Tango / 
 
 ## [NSRRC](nsrrc/index.md)
 
-CORA's first Taiwan facility (the National Synchrotron Radiation Research Center, Hsinchu, operating two rings, the Taiwan Light Source and the Taiwan Photon Source). TPS 07A is reverse-engineered from public open source (the `light911/NSRRC_TPS07A` + `light911/TPS07A-Meshbest` control trees plus JACoW proceedings), chosen because it is the only NSRRC beamline with a complete public control tree, and because its Blu-Ice/DCSS-over-EPICS seam is the 2-BM TomoScan pattern at an MX beamline. TPS 05A is its MX-cluster sibling, a reuse-and-reinforce deployment on the same Site, Blu-Ice/DCSS stack, and MD3 + ISARA kit (with an EIGER2 X 9M), modelled from the SPXF facility pages and the 2025 cluster paper. NSRRC publishes no official org code, so the corpus is scattered personal GitHub accounts; full provenance is in the [research brief](https://github.com/xmap/cora/blob/main/docs/deployments/nsrrc/_research_brief.md).
+CORA's first Taiwan facility (the National Synchrotron Radiation Research Center, Hsinchu, operating two rings, the Taiwan Light Source and the Taiwan Photon Source). TPS 07A is reverse-engineered from public open source (the `light911/NSRRC_TPS07A` + `light911/TPS07A-Meshbest` control trees plus JACoW proceedings), chosen because it is the only NSRRC beamline with a complete public control tree, and because its Blu-Ice/DCSS-over-EPICS seam is the 2-BM TomoScan pattern at an MX beamline. TPS 05A is its MX-cluster sibling, a reuse-and-reinforce deployment on the same Site, Blu-Ice/DCSS stack, and MD3 + ISARA kit (with an EIGER2 X 9M), modelled from the SPXF facility pages and the 2025 cluster paper. NSRRC publishes no official org code, so the corpus is scattered personal GitHub accounts.
 
 | Beamline | Status | What it is |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ CORA's first Taiwan facility (the National Synchrotron Radiation Research Center
 
 ## [PETRA III](petra-iii/index.md)
 
-CORA's Site for PETRA III (DESY, Hamburg), and its second Tango / Sardana control house-style after MAX IV / ALBA. P01 is reverse-engineered from P01's own public OnlineXML device registry (the `online_*.xml` Tango device list under `petra-iii-debian-packages` on gitlab.desy.de), extracted with the `scripts/reverse_engineer/` `--source onlinexml` path, chosen because the OnlineXML carries real per-device Tango handles across all 18 public PETRA III beamlines and because P01's NRS / RIXS dynamics techniques are new to CORA's technique surface. Full provenance is in the [research brief](https://github.com/xmap/cora/blob/main/research/petra-iii/survey.md).
+CORA's Site for PETRA III (DESY, Hamburg), and its second Tango / Sardana control house-style after MAX IV / ALBA. P01 is reverse-engineered from P01's own public OnlineXML device registry (the `online_*.xml` Tango device list under `petra-iii-debian-packages` on gitlab.desy.de), extracted with the `scripts/reverse_engineer/` `--source onlinexml` path, chosen because the OnlineXML carries real per-device Tango handles across all 18 public PETRA III beamlines and because P01's NRS / RIXS dynamics techniques are new to CORA's technique surface.
 
 | Beamline | Status | What it is |
 | --- | --- | --- |

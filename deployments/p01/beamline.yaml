@@ -12,7 +12,7 @@
 # that registry; vendor part numbers, serials, energy ranges, crystal cuts, and
 # physical positions are not in it and are open questions. Every value is carried
 # confirm until P01 staff verify it (a registry snapshot is strong evidence, not a
-# CORA-owned fact). The extraction is in research/petra-iii/.
+# CORA-owned fact).
 #
 # WHAT IS NEW: not a device Family. P01's stages bind existing Families
 # (Monochromator, Mirror, Slit, Transfocator, LinearStage, RotaryStage, Camera,

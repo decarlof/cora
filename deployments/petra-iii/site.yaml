@@ -10,8 +10,7 @@
 # Status: reverse-engineered. CORA has not been connected to PETRA III and no staff
 # have confirmed this model. Every value below is read from public open source (the
 # gitlab.desy.de tango-ds / fsec-sardana / petra-iii-debian-packages control trees,
-# the photon-science.desy.de beamline catalog, and the deep-research survey at
-# research/petra-iii/survey.md) or inferred, and is carried as `pending` until staff
+# the photon-science.desy.de beamline catalog) or inferred, and is carried as `pending` until staff
 # confirm it. Do not invent facility specifics here; carry them as questions on each
 # beamline's open-questions page.
 #
