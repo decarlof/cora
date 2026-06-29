@@ -137,4 +137,12 @@ CORA's Site for PETRA III (DESY, Hamburg), and its second Tango / Sardana contro
 | [P11](p11/index.md) | Reverse-engineered | high-throughput macromolecular crystallography (rotation MX) and bio-imaging on a goniometer + Pilatus detector with cryostream cooling; PETRA III's first MX beamline, a reuse-and-reinforce deployment coining no new vocabulary (reuses the i03 MX vocabulary and the pending `mx_data_collection` / `tomography` Methods); a sparse registry, so the experiment hutch is modelled as grouped stages with the goniometer carried as a question |
 | [P03](p03/index.md) | Reverse-engineered | micro- and nanofocus small- and wide-angle X-ray scattering (SAXS / WAXS, 9-23 keV) across shared P02 / P03 optics and two endstations (a microfocus endstation and the nanofocus GINIX waveguide endstation); the fleet's first SAXS / WAXS beamline, coins no new Family, brings Galil DMC and SmarPod controllers, reusing the pending `small_angle_scattering` / `wide_angle_scattering` Methods |
 
+## [ALS](als/index.md)
+
+CORA's Site for the Advanced Light Source (Lawrence Berkeley National Laboratory, Berkeley), and its first BCS controls house-style: every prior Site is EPICS, Tango / Sardana, or BLISS, while the ALS runs BCS (the Beamline Control System), a LabVIEW stack. 8.3.2 is reverse-engineered from ALS's public facility pages ([als.lbl.gov](https://als.lbl.gov/beamlines/8-3-2/), [microct.lbl.gov](https://microct.lbl.gov/)) and the public [als-computing](https://github.com/als-computing) GitHub org, chosen to reuse the tomography vocabulary on a new facility and a new control plane. Its device topology is read from the DXchange / DXfile HDF5 data-record schema that the ALS tooling reads (a third descriptor mode, between FXI's real EPICS PVs and FAXTOR's no-manifest); the live BCS control handles are not public and stay `confirm`-pending. The ALS-U upgrade (storage-ring dark time no sooner than October 2027, at least two years) is a roadmap constraint, with 8.3.2's upgrade fate carried as a staff question.
+
+| Beamline | Status | What it is |
+| --- | --- | --- |
+| [8.3.2](8-3-2/index.md) | Reverse-engineered | hard X-ray micro-tomography (micro-CT) on a Superbend source, 6-43 keV, ~1 micron; reuses the 2-BM / FXI / FAXTOR tomography Families and Methods, novelty is the Site and its BCS / LabVIEW control plane |
+
 Cross-facility vocabulary (Capabilities, Methods) lives in the [Catalog](../catalog/index.md), since it is not bound to any single Site.

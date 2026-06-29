@@ -47,12 +47,16 @@ The beamlines with publicly confirmed technique mappings that fall in CORA's dep
 
 ## 3. Control-system stack, by layer
 
-ALS, through its `als-computing` group, standardizes on the **Bluesky data-acquisition ecosystem** for in-scan acquisition and on **Prefect + Globus** for data movement and compute orchestration. This is a materially different posture from NSRRC (heterogeneous per-beamline) and closer to the Diamond `dodal` / Sirius `sophys` facility-framework pattern, though the public evidence is concentrated in a handful of beamlines.
+!!! warning "Corrected by the 8.3.2 repo dive (2026-06-29)"
+    The deep-research pass inferred an **EPICS** floor (below). A hands-on read of the `als-computing` org corrected this: **ALS runs BCS (the Beamline Control System), a LabVIEW stack, NOT EPICS.** Confirmed by [`als-computing/als.bcs`](https://github.com/als-computing/als.bcs) ("metadata from text data files created by the Beamline Controls System (BCS)") and [`als-computing/bcs-api`](https://github.com/als-computing/bcs-api) ("Combining LabView BCS with Bluesky": BCS scans wrapped as bluesky ophyd `fly` devices). There are **no EPICS PVs** for 8.3.2. The "central gap" the pass flagged (no public device topology) was also resolved: the device structure is recoverable from the **DXchange / DXfile HDF5 data-record schema** the ALS tooling reads (the SciCat ingester `als-computing/scicat_beamline` and the reconstruction backend `als-computing/microct`); only the live BCS channel handles remain staff-only. See docs/deployments/8-3-2/ and its descriptor deployments/8-3-2/beamline.yaml for the recovered topology. The EPICS-floor bullets below are kept as the original (now-superseded) pass for provenance.
 
-### Device IO / EPICS (the floor)
+ALS, through its `als-computing` group, standardizes on the **Bluesky data-acquisition ecosystem** for in-scan acquisition and on **Prefect + Globus** for data movement and compute orchestration. This is a materially different posture from NSRRC (heterogeneous per-beamline) and closer to the Diamond `dodal` / Sirius `sophys` facility-framework pattern, though the public evidence is concentrated in a handful of beamlines. The device floor below it is BCS (LabVIEW), with the bluesky layer reaching it through the BCS API rather than over EPICS Channel Access.
 
-- ALS is understood to run an **EPICS** device floor (consistent with the Bluesky/Ophyd layer above it, which abstracts EPICS). **[uncertain]** No public source read this pass exposes ALS EPICS IOC names, PV grammar, or the per-beamline device tree. This is the central gap.
-- The `Ophyd-Websocket` dependency of the finch frontends implies an Ophyd hardware-abstraction layer over the device floor, but the specific protocol bindings (EPICS CA, pva via p4p, serial) were **not** confirmed: a claim asserting Ophyd's EPICS/pva/serial protocol detail was **refuted** in verification (1-2) and must not be carried forward. **[refuted]**
+### Device IO (the floor): BCS, not EPICS
+
+- **[verified, repo dive]** The floor is **BCS (Beamline Control System), a LabVIEW house-style**, surfaced as scan files (Time Scan, Single Motor Scan, Trajectory Scan) whose headers carry the DXchange / DXfile HDF5 device-state data record ([`als-computing/als.bcs`](https://github.com/als-computing/als.bcs)). No public per-beamline BCS channel manifest exists; the live handles are staff-only (CTRL-1).
+- **[superseded inference]** The deep-research pass guessed an EPICS device floor (consistent with a generic Bluesky/Ophyd layer). This is wrong for ALS: BCS is LabVIEW, and bluesky reaches it through the BCS API, not EPICS CA. Kept for provenance.
+- A claim asserting Ophyd's EPICS/pva/serial protocol detail was **refuted** in verification (1-2) and must not be carried forward. **[refuted]**
 
 ### Orchestration + scan engine (the seam layer)
 
@@ -68,6 +72,24 @@ ALS, through its `als-computing` group, standardizes on the **Bluesky data-acqui
 
 - **Tiled** is present in the stack as the structured-data access layer fronting Bluesky documents. A stronger claim (Tiled integrated into tomography reconstruction visualization with remote slicing / live streaming) was **refuted** in verification (1-2) and must not be carried forward. **[refuted]**
 - `als-computing/microct` provides "Jupyter notebooks to reconstruct and visualize microCT data from ALS beamline 8.3.2." A direct file-tree inspection plus a grep for `epics|caget|caput|pvaccess|IOC|motor|detector|aerotech|pso` returned **zero** controls matches: the only motor/detector hits are HDF5 metadata reads from already-acquired files. This repo is the **compute/recon layer**, not the controls stack. **[verified]** ([microct](https://github.com/als-computing/microct))
+
+### 8.3.2 device topology, from the DXchange / DXfile HDF5 data record
+
+**[verified, repo dive]** against `als-computing/scicat_beamline` (`src/scicat_beamline/ingesters/als_832_dx_4.py`) and `als-computing/microct` (`backend/ALS_recon_functions.py`). The HDF5 metadata tree names the device hierarchy and its axes; this is the device STRUCTURE that seeded `deployments/8-3-2/beamline.yaml`. The live BCS handles are NOT public (CTRL-1).
+
+| HDF5 path | CORA device | Family |
+| --- | --- | --- |
+| `/measurement/instrument/source/{source_name,current,beam_intensity_incident}` | Superbend + StorageRing | InsertionDevice (Supply) + StorageRing (loose) |
+| `/measurement/instrument/monochromator/{energy,setup/Z2,setup/turret1,setup/turret2,setup/temperature_tc2,setup/temperature_tc3}` | Monochromator | Monochromator |
+| `/measurement/instrument/slits/setup/{hslits_A_Door,hslits_A_Wall,hslits_center,hslits_size,vslits_Lead_Flag}` | BeamSlit | Slit |
+| `/measurement/instrument/attenuator/setup/filter_y` | BeamFilter | Filter |
+| `/measurement/instrument/sample_motor_stack/setup/{axis1pos,axis2pos,axis5pos,sample_x,sample_y}` | SampleRotary + SamplePositioning | RotaryStage + LinearStage |
+| `/measurement/instrument/detection_system/scintillator/scintillator_type` | Scintillator | Scintillator |
+| `/measurement/instrument/detection_system/objective/camera_objective` | CameraObjective | Objective |
+| `/measurement/instrument/detector/{model,pixel_size,binning_x,binning_y,exposure_time,temperature,dimension_x,dimension_y,dark_field_value,delay_time}` | Camera | Camera |
+| `/measurement/instrument/camera_motor_stack/setup/{camera_distance,camera_elevation,tilt_motor}` | DetectorStack | LinearStage |
+
+Open: which `axisNpos` is the tomographic rotation (ROT-1); detector specs are per-dataset, not a fixed manifest (DET-1); BCS live handles not public (CTRL-1).
 
 ---
 
@@ -100,9 +122,9 @@ The **`github.com/als-computing` org** is the single most valuable controls/orch
 
 ## 6. The CORA seam (initial read)
 
-This is a first pass, not a committed seam. It applies the same 2-BM / FXI / NSRRC lens: EPICS and device IO are the floor CORA never replaces; the higher scan/orchestration layer is where CORA replaces or drives through.
+This is a first pass, not a committed seam. It applies the same 2-BM / FXI / NSRRC lens: device IO is the floor CORA never replaces; the higher scan/orchestration layer is where CORA replaces or drives through.
 
-**Where EPICS stays the floor.** ALS beamline device IO is understood to be EPICS, abstracted by Ophyd under the Bluesky layer. CORA's ControlPort would actuate **through** this floor exactly as at 2-BM and FXI; CORA never owns PVs, IOCs, or the device layer. This must be confirmed against the repos / staff, since no public source exposed the IOC/PV floor this pass. **[uncertain]**
+**Where BCS stays the floor.** ALS beamline device IO is **BCS (LabVIEW)**, reached by the bluesky layer through the BCS API. CORA's ControlPort would actuate **through** this floor exactly as at 2-BM and FXI; CORA never owns the BCS channels or the device layer. The live BCS handles are not public (staff-only, CTRL-1), so they are carried pending, the way the MX3 / ID32 heterogeneous-control precedents model opaque edge handles. **[verified, repo dive]**
 
 **What CORA would replace or drive through.** ALS is closer to the facility-framework pattern (Bluesky everywhere) than to NSRRC's heterogeneous per-beamline orchestration. The seam is therefore likely uniform across beamlines:
 
@@ -110,7 +132,7 @@ This is a first pass, not a committed seam. It applies the same 2-BM / FXI / NSR
 2. **Data movement + compute (`splash_flows`, Prefect + Globus).** This is a post-acquisition orchestration layer moving data to ALCF/NERSC for reconstruction. CORA's data-of-record (PG event store) and its own compute conduct path would **subsume** the Prefect/Globus orchestration as a source-to-learn-from, not a system CORA depends on. The detector-native HDF5 files become a source to subsume, not a dependency.
 
 **Open design questions.**
-- Where does the EPICS IOC/PV-level device topology and Bluesky plan/queue-server config actually live? It was not in any public source this pass. Internal GitLab, beamline-internal repos, or staff only? **This is the top blocker before any 8.3.2 device modelling.**
+- The 8.3.2 device structure is recovered from the DXfile HDF5 data record, but the live BCS channel handles per device are staff-only. Where (if anywhere) is the BCS channel manifest version-controlled? **This is the top blocker before CORA can actuate 8.3.2.**
 - What is the full beamline-to-stack mapping beyond the handful covered (8.3.2, 7012, 733, 5.3.1, AMBER)? Which other ALS beamlines run Bluesky vs. legacy SPEC/EPICS-only stacks?
 - PSS / interlock implementation: no public source exposes this; must come from staff.
 - Which beamlines survive ALS-U unchanged vs. are rebuilt/relocated, so deployment effort targets stable instruments (e.g. is 8.3.2 micro-CT affected by dark time)?
