@@ -1,0 +1,71 @@
+Our evaluation is a case-based demonstration: a structured walkthrough of the
+four auditor tasks on one recorded run. It shows feasibility and explanatory
+power, but it is not an empirical validation, and it does not establish that the
+scrubber improves audit speed or accuracy. We report a single run, on a single
+instrument, and we have not yet run a user or expert study; whether the scrubber
+speeds real audits, and which encodings practitioners prefer, are open empirical
+questions. The interface is a research prototype over exported run data rather
+than a deployed beamline tool, so we make no claims about throughput, scale, or
+integration cost.
+
+The figures are not mock-ups. They derive from one passing integration
+scenario, exercised against a real Kernel and Postgres event store, and the run
+data, its generator, and the per-figure render scripts are released with the
+paper. What is real is what that scenario produced and we mirrored into the
+figure data: the activities, the four iteration verdicts (open, open, open,
+converged), the four run-lifecycle events, and the supervisor's recorded hold
+and resume decisions. What is synthetic is only the per-event timestamps,
+staggered for a readable axis because the scenario records one logical instant;
+the overnight wall-clock spread is illustrative, stated in prose rather than
+measured. The generator depends on nothing but the standard library and needs no
+database, so a reader can regenerate the figure data directly.
+
+Two boundaries matter for how the contribution should be read, both about what
+the run and the badge are not. The run is
+\emph{conducted} and \emph{agent-supervised}, not agent-closed: the system
+orchestrates the alignment and records every step, and a supervisor agent holds
+and resumes the run on beam conditions, but no model is in the loop choosing what
+to measure or how to steer it. That
+supervisor is a deterministic, rule-based agent making recorded decisions, so
+the figures show a genuine human-agent handoff rather than a model selecting
+experiments, and we are careful not to claim the latter. The fidelity badge
+likewise attests \emph{faithfulness}, that the replayed state matches the
+recorded expansion, by recomputing content-addressed hashes against an
+append-only store; it is an integrity check, not adversarial tamper resistance,
+under the conditions stated in Section~\ref{sec:substrate}.
+
+The fold-to-version helper that drives the cursor was written for this
+visualization on top of the system's existing fold-on-read path. The fold is
+scoped to one run's stream, not the whole store, so the work is bounded by a
+single run rather than the entire event history; but because that path keeps no
+snapshots, the cost of reconstructing a distant instant still grows with the
+length of that stream. For the short run shown here it is imperceptible, and for
+long campaigns the standard remedies apply directly, periodic snapshots to fold
+from and incremental re-folding rather than replaying from the start each time;
+we name these rather than build them. Three further extensions are natural: a
+live now-edge that subscribes to the event tail so the same timeline can monitor
+a run in progress, run-to-run diffing so two campaigns share one axis, and a
+deployed read interface, whose first read-only slice is already on the roadmap. The
+closest extension is an agent-closed steered loop, an optimizer that decides the
+next action rather than a supervisor that recovers a conducted one; because such
+an optimizer would record its choices through the same decision substrate, the
+run-lifecycle lane and the decision records would carry its next-action choices
+and be audited exactly as the supervisor's holds and resumes are here. We expect
+the design to generalize in the same way beyond this run, to other conducted
+procedures and other facilities, since nothing in the scrubber is specific to
+this case beyond a small vocabulary it reads from the log: the requirement on a
+host system is modest, an append-only, deterministically-foldable event log with
+a content-addressed expansion and a recorded actor on each event.
+
+Three threats temper these claims. The construct question is whether T1 through
+T4 capture what auditing a conducted run actually needs; we derived them from
+practice rather than from observing auditors at work, so the set may be
+incomplete, missing for example causal blame across steps or finer parameter
+provenance, or may favor an encoding scientists would not. There is also an
+internal threat, since the walkthrough is authored by us, who already know where
+each verdict, open interval, and gap lies; an independent auditor reading the
+same figures cold might not find them as readily, and we ran no such study.
+Finally, generality is the external threat: our argument for it is structural,
+not demonstrated beyond the single beamline, run, and rule-based supervisor
+reported here. These open questions set the agenda for the user study and
+multi-beamline deployment that should follow.
