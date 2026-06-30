@@ -58,9 +58,9 @@ A survey can exist with no deployment yet (a candidate facility), and a deployme
 | NSLS-II | yes (retrospective) | 28 beamlines (+ recurrence.md); 24 deployed + 4 research-only (qas, tes, nyx, opls) | yes | EPICS / bluesky, public profile collections |
 | SLAC | yes (retrospective) | (from `pcdshub` at build time) | yes | EPICS / `pcdshub` |
 | Australian Synchrotron | yes (retrospective) | none | yes | heterogeneous (EPICS + Exporter + REST + TCP) |
-| MAX IV | needed | none | yes | Tango / Sardana |
+| MAX IV | yes | none (partially buildable: 2 beamlines) | yes | Tango / Sardana; canonical config firewalled (gitlab.maxiv.lu.se), full per-Asset topology public for NanoMAX + CoSAXS (contrast DAQ framework) |
 
-"needed" marks a modeled Site that does not yet carry a Tier-1 survey (only MAX IV remains). "retrospective" marks a survey written after the fleet was already modeled: some EPICS facilities (Diamond, NSLS-II, SLAC) are modeled by reading the public controls library per beamline at build time rather than via a pre-extracted Tier-2 pass, so their survey records the roster, the modellable set, and the seam after the fact rather than ahead of it.
+"retrospective" marks a survey written after the fleet was already modeled: some EPICS facilities (Diamond, NSLS-II, SLAC) are modeled by reading the public controls library per beamline at build time rather than via a pre-extracted Tier-2 pass, so their survey records the roster, the modellable set, and the seam after the fact rather than ahead of it. MAX IV's canonical per-beamline device config is on a firewalled internal GitLab, but a full per-Asset Tango topology is public for two beamlines via the `contrast` DAQ framework (NanoMAX, 234 handles; CoSAXS, 68), so a partial Tier-2 pass is buildable there; SoftiMAX (contrast scaffold, too thin), BioMAX (controller code, not topology), and the CORA-relevant tomography lines ForMAX and TomoWISE (no public device source) are all staff-question deployments.
 
 ## APS extraction tooling (EPICS-specific)
 
