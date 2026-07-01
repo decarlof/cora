@@ -366,7 +366,7 @@ _ALLOWED_LOOSE_FAMILIES = {
     "Shielding": "passive-deferred: passive PSS-grade shielding (19-BM guillotines, ENC-1)",
     "SlipRing": "passive-deferred: passive rotation feedthrough (TomoWISE)",
     "Wedge": "passive-deferred: passive fixed wedge (2-BM)",
-    "Diagnostic": "staged: beam-position monitor, Sensor Role; fold-vs-promote open (DIAG-1)",
+    "Diagnostic": "staged: arrival-time / photon-spectrum Sensor; fold-vs-promote open (DIAG-1)",
     "Backlight": "staged: new illumination affordance; rule-of-three open (ROBOT-1/DET-1)",
     "BetrandLens": "staged: novel TXM optic, FXI-only; rule-of-three open (OPTIC-3)",
     "MultilayerLaueLens": "staged: novel 1D crossed-pair nano-focus optic, HXN-only (OPTIC-3)",
@@ -374,7 +374,6 @@ _ALLOWED_LOOSE_FAMILIES = {
     "Photodiode": "staged: PIN photodiode, Sensor Role; Family-vs-Sensor open (RAD-1)",
     "Baffle": "staged: passive baffle inside the 2-BM SafetyStack; review name/role",
     "Screen": "staged: motorized phosphor diagnostic flag (2-BM, FLAG-1); review name-vs-behavior",
-    "BeamPositionMonitor": "staged: position/intensity Sensor; fold-vs-promote open (DIAG-1)",
     "PhaseRetarder": "staged: polarization phase-retarder (4-ID); rule-of-three open (POL-1)",
     "PolarizationAnalyzer": "staged: polarization analyzer (4-ID); rule-of-three open (POL-2)",
     "Laser": "staged: pump-probe laser (4-ID POLAR); model-vs-hazard open (SAMPLE-1)",
@@ -395,9 +394,8 @@ _SUPPLY_LOOSE_FAMILIES = {"Beam", "Vacuum", "StorageRing"}
 # graduated into the catalog or recorded here with a one-line decision: the
 # signal is mechanical, the decision stays human.
 _PROMOTION_REVIEWED = {
-    "Diagnostic": "hold: Sensor fold-vs-promote still open (DIAG-1)",
+    "Diagnostic": "hold: arrival-time / photon-spectrum Sensor fold-vs-promote still open (DIAG-1)",
     "Screen": "hold: phosphor beam-viewing screen (2-BM, BMM); fold-vs-promote open (FLAG-1)",
-    "BeamPositionMonitor": "hold: fold-vs-promote across 4-id/8-id/9-id/iss/fmx/cdi (DIAG-1)",
     "Laser": "hold: pump-probe laser model-vs-hazard open (4-id + lcls-mfx; SAMPLE-1)",
     "Backlight": "hold: sample-illumination fold-vs-promote open (i03 + i24 + fmx + i19; DET-1)",
     "PhaseRetarder": "hold: phase-retarder, 4-id + p09; 2nd consumer, graduation-due (POL-1)",
