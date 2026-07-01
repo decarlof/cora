@@ -24,7 +24,7 @@
 
 `Transfocator` and `TemperatureController` were tracked here too and have since graduated to catalog Families. `Transfocator` is the CRL focusing optic Family the two 8-ID-D lens stacks bind (the lens material and lenslet count stay open, `OPT-3`). `TemperatureController` (#350) presents the `Regulator` Role (the LakeShore 336 at 8-ID-E and the Quantum Northwest holders at 8-ID-I bind it). Neither is held for gate-review any longer.
 
-`Magnet` and `Preamplifier` are also loose on a single physical beamline (4-ID; `6idb-bits` is a 4-ID fork, see the [4-ID model page](../4-id/model.md#deliberately-not-here-yet)).
+`Magnet` was tracked here too on a single physical beamline (4-ID; `6idb-bits` is a 4-ID fork, see the [4-ID model page](../4-id/model.md#deliberately-not-here-yet)); it has since graduated to a catalog Family on the 4-ID + i10-1 + ID32 rule-of-three (it presents the `Regulator` Role). `Preamplifier` stays loose on that single physical beamline.
 
 ## The Diffractometer Assembly (landed)
 

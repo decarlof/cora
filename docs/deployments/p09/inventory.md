@@ -4,7 +4,7 @@
 
 This cut models the MONO hutch (the undulator, the DCM, the mirrors, the CRL, the slit, the absorber, the resonant-scattering instrument, the fluorescence detectors), the DIF diffraction hutch, and the MAG high-field magnetism endstation. It is the cross-cutting reference view of the [Source](beamline.md) walk and the [Sample](equipment/sample.md) and [Detector](equipment/detector.md) pages, authored from the same [`beamline.yaml`](https://github.com/xmap/cora/blob/main/deployments/p09/beamline.yaml) descriptor.
 
-Devices bind to a catalog [Family](../../catalog/families.md) wherever one fits. P09 **coins no new Family**: it is the second consumer of the allowlisted-loose `PhaseRetarder`, `PolarizationAnalyzer`, and `Magnet` Families the APS 4-ID POLAR deployment introduced, and reuses the optics / motion / detector Families otherwise. The Tango device handles are read from the public OnlineXML registry; no vendor Models are bound.
+Devices bind to a catalog [Family](../../catalog/families.md) wherever one fits. P09 **coins no new Family**: it is the second consumer of the allowlisted-loose `PhaseRetarder` and `PolarizationAnalyzer` Families the APS 4-ID POLAR deployment introduced, a further consumer of the graduated catalog `Magnet` Family (earned across 4-ID + i10-1 + ID32), and reuses the optics / motion / detector Families otherwise. The Tango device handles are read from the public OnlineXML registry; no vendor Models are bound.
 
 ## The Asset tree
 
@@ -30,7 +30,7 @@ Root Asset `P09` (`tier = Unit`, `facility_code = petra-iii`); sub-systems nest 
 | `FluorescenceDetector` | `Device` | EnergyDispersiveSpectrometer | p09-mono | SIS3302 digitizer (ROI explosion grouped) + MCA (DET-1) |
 | `Goniometer` (DIF) | `Device` | Goniometer | p09-dif | DIF six-circle diffractometer (OMS VME58); not the Assembly (DIFF-1) |
 | `SampleStage` (DIF) | `Device` | LinearStage | p09-dif | DIF sample bank (p09/motor/dif, ~69 axes); grouped (GROUP-1) |
-| `Magnet` | `Device` | Magnet (loose) | p09-mag | 14 T superconducting sample-environment magnet (MAG-1) |
+| `Magnet` | `Device` | Magnet | p09-mag | 14 T superconducting sample-environment magnet; graduated Family, a further consumer (MAG-1) |
 | `Goniometer` (MAG) | `Device` | Goniometer | p09-mag | MAG six-circle diffractometer + mu circle (DIFF-1) |
 | `SampleHexapod` | `Device` | Hexapod | p09-mag | MAG sample hexapod (hexa_*) (SAMPLE-1) |
 | `SamplePiezo` (MAG) | `Device` | LinearStage | p09-mag | MAG PI E-710 scan + E-725 sample piezos (SAMPLE-1) |
@@ -40,7 +40,7 @@ Root Asset `P09` (`tier = Unit`, `facility_code = petra-iii`); sub-systems nest 
 | `PilatusDetector` (MAG) | `Device` | Camera | p09-mag | MAG Pilatus 100k (DET-1) |
 | `AndorCamera` | `Device` | Camera | p09-mag | MAG Andor camera (Lima) (DET-1) |
 
-Families reused from the catalog: `InsertionDevice`, `Monochromator`, `Mirror`, `Transfocator`, `Slit`, `Filter`, `LinearStage`, `Goniometer`, `TemperatureController`, `Hexapod`, `Camera`, `EnergyDispersiveSpectrometer`. Allowlisted-loose Families reused (the 4-ID POLAR precedent): `PhaseRetarder` (`POL-1`), `PolarizationAnalyzer` (`POL-2`), `Magnet` (`MAG-1`). No new family is coined and nothing graduates.
+Families reused from the catalog: `InsertionDevice`, `Monochromator`, `Mirror`, `Transfocator`, `Slit`, `Filter`, `LinearStage`, `Goniometer`, `TemperatureController`, `Hexapod`, `Camera`, `EnergyDispersiveSpectrometer`, `Magnet` (graduated across 4-ID + i10-1 + ID32; presents `Regulator`, `MAG-1`). Allowlisted-loose Families reused (the 4-ID POLAR precedent): `PhaseRetarder` (`POL-1`), `PolarizationAnalyzer` (`POL-2`). No new family is coined here.
 
 ## Cross-cutting controllers
 

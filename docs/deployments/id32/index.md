@@ -24,7 +24,7 @@ For the modelling, ID32's significance is that it brings **three loose families 
 - **`Magnet`** gets a third consumer (4-ID + i10-1 + the ID32 9 T XMCD magnet).
 - **`PolarizationAnalyzer`** gets a third consumer (4-ID + i10 + the ID32 RIXS polarimeter).
 
-Per the owner decision, each graduation is a dedicated gated catalog PR (see [Model](model.md#loose-families-held-at-the-rule-of-three)). `SpectrometerArm` has graduated; `Magnet` and `PolarizationAnalyzer` stay held.
+Per the owner decision, each graduation is a dedicated gated catalog PR (see [Model](model.md#loose-families-held-at-the-rule-of-three)). `SpectrometerArm` and `Magnet` have graduated; `PolarizationAnalyzer` stays held.
 
 ## Scope: what is and is not modelled
 
@@ -32,8 +32,8 @@ Per the owner decision, each graduation is a dedicated gated catalog PR (see [Mo
 | --- | --- | --- |
 | Shared optics (`id32-optics`) | Yes | The twin APPLE-II undulators, the polarization and incident-energy pseudo-axes, the soft X-ray PGM, the focusing mirrors, the beam slits |
 | RIXS endstation (`id32-rixs`) | Yes | The dispersive RIXS spectrometer arm (catalog `SpectrometerArm`), the 4-circle diffractometer + reciprocal-space axis, the scattered-beam polarimeter (loose `PolarizationAnalyzer`), the Andor CCD |
-| XMCD endstation (`id32-xmcd`) | Yes | The 9 T XMCD magnet (loose `Magnet`), the LakeShore VTI and coil-diagnostic controllers, the XES spectrometer arm (catalog `SpectrometerArm`), the Andor CCD, the sample stage |
-| The loose-family graduations | Mixed | `SpectrometerArm` graduated (`RIXS-1`); `Magnet` and `PolarizationAnalyzer` reached a rule-of-three but stay held, each graduation a separate gated PR (`MAG-1`, `POL-2`) |
+| XMCD endstation (`id32-xmcd`) | Yes | The 9 T XMCD magnet (catalog `Magnet`), the LakeShore VTI and coil-diagnostic controllers, the XES spectrometer arm (catalog `SpectrometerArm`), the Andor CCD, the sample stage |
+| The loose-family graduations | Mixed | `SpectrometerArm` (`RIXS-1`) and `Magnet` (`MAG-1`) graduated; `PolarizationAnalyzer` reached a rule-of-three but stays held, its graduation a separate gated PR (`POL-2`) |
 | Exact optics handles | No | The PGM, mirrors, slits, diffractometer axes, and XMCD sample stage are carried confirm-pending (`MONO-1`, `OPT-1`, `OPT-2`, `DIFF-1`, `SAMPLE-1`) |
 | PSS permit signals and vacuum extent | No | Absent from the BLISS config, carried pending, not invented (`PSS-1`, `SUP-1`) |
 
@@ -43,8 +43,8 @@ The deferred parts are recorded on [Model](model.md#deliberately-not-here-yet).
 
 - **A new Site and a new control house-style.** ESRF is the 7th Site (`deployments/esrf/site.yaml`); the BLISS / Tango / IcePAP handles are modelled as opaque edge strings over the `ControlPort`, the way the MX3 heterogeneous-control precedent does (`CTRL-1`).
 - **The polarization spine reuses i06 / i10.** The twin APPLE-II undulators bind `InsertionDevice` and the polarization is a `PseudoAxis` over the undulator phase (`POL-1`).
-- **Three loose families reached the rule-of-three.** `SpectrometerArm` (RIXS + XES arms, the same controller class) has since graduated into the catalog; `Magnet` (the 9 T XMCD magnet) and `PolarizationAnalyzer` (the RIXS polarimeter) stay held, graduations deferred to dedicated PRs.
-- **No new family coined here.** The PGM binds `GratingMonochromator`, the diffractometer `Goniometer`, the CCDs `Camera`, the LakeShores `TemperatureController`; the dispersive arms bind the graduated `SpectrometerArm`.
+- **Three loose families reached the rule-of-three.** `SpectrometerArm` (RIXS + XES arms, the same controller class) and `Magnet` (the 9 T XMCD magnet) have since graduated into the catalog; `PolarizationAnalyzer` (the RIXS polarimeter) stays held, its graduation deferred to a dedicated PR.
+- **No new family coined here.** The PGM binds `GratingMonochromator`, the diffractometer `Goniometer`, the CCDs `Camera`, the LakeShores `TemperatureController`; the dispersive arms bind the graduated `SpectrometerArm` and the 9 T magnet the graduated `Magnet`.
 
 ## The beamline
 

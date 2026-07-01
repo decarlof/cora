@@ -377,7 +377,6 @@ _ALLOWED_LOOSE_FAMILIES = {
     "BeamPositionMonitor": "staged: position/intensity Sensor; fold-vs-promote open (DIAG-1)",
     "PhaseRetarder": "staged: polarization phase-retarder (4-ID); rule-of-three open (POL-1)",
     "PolarizationAnalyzer": "staged: polarization analyzer (4-ID); rule-of-three open (POL-2)",
-    "Magnet": "staged: sample-environment magnet (4-ID POLAR); rule-of-three open (MAG-1)",
     "Laser": "staged: pump-probe laser (4-ID POLAR); model-vs-hazard open (SAMPLE-1)",
     "Rheometer": "staged: rheometer shear-cell (8-ID); rule-of-three open (SAMPLE-1)",
     "FlightPath": "staged: evacuated XPCS flight path (8-ID); rule-of-three open (XPCS-2)",
@@ -403,7 +402,6 @@ _PROMOTION_REVIEWED = {
     "Backlight": "hold: sample-illumination fold-vs-promote open (i03 + i24 + fmx + i19; DET-1)",
     "PhaseRetarder": "hold: phase-retarder, 4-id + p09; 2nd consumer, graduation-due (POL-1)",
     "PolarizationAnalyzer": "hold: 4-id + i10 + esrf-id32 polarimeter; graduation-due (POL-2)",
-    "Magnet": "hold: sample-env magnet, 4-id + i10-1 + esrf-id32; graduation-due (MAG-1)",
     "SlipRing": "hold: passive feedthrough (tomowise + i-tomcat); passive-deferred, not an Asset",
     "PressureCell": "hold: DAC, 13-id-d + p02; 2nd consumer, graduation-due (PRESSURE-1)",
 }

@@ -35,7 +35,7 @@ ID32 was reverse-engineered from the ESRF's open BLISS Beacon device database ([
 
 | ID | Priority | Question | CORA assumes | Resolves |
 | --- | --- | --- | --- | --- |
-| MAG-1 | Blocks-go-live | The 9 T / 4 T XMCD split-coil magnet (field range, ramp, the two coils) and its cryogen plant. | Binds the loose `Magnet`, the third consumer after 4-ID + i10-1, held pending a dedicated graduation PR; the field is a settable axis (Regulator). | The magnet modelling; the CORA graduation decision is on [Model](model.md#loose-families-held-at-the-rule-of-three). |
+| MAG-1 | Blocks-go-live | The 9 T / 4 T XMCD split-coil magnet (field range, ramp, the two coils) and its cryogen plant. | Binds the catalog `Magnet` Family (graduated across 4-ID + i10-1 + ID32); the field is a settable axis (Regulator), the per-Asset field detail pending. | The per-Asset magnet field / control detail; the family graduation is settled (see [Model](model.md#loose-families-held-at-the-rule-of-three)). |
 | TEMP-1 | Nice-to-have | The LakeShore 336 (VTI sample) and 340 (coil / shield diagnostics) sensor and loop maps, and the He needle valve. | Two `TemperatureController` Assets presenting the `Regulator` Role; the needle valve folds into the VTI. | The temperature-control modelling. |
 | SAMPLE-1 | Blocks-go-live | The XMCD sample-positioning stage axes inside the magnet bore. | A `LinearStage`; axis set pending. | The sample-stage modelling. |
 

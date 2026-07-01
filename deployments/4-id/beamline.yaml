@@ -269,33 +269,33 @@ sample-environment:
   enclosure: 4-ID-B
   intro: "The sample-environment apparatus: superconducting magnets, temperature controllers, and the sample positioning tables. POLAR's magnetic-scattering signature."
   note: >
-    Magnets (bmag/emag 2 T, magnet911, the Kepco-driven gmag) bind a loose Magnet
-    Family (MAG-1, FAM-1); the LakeShore 336/340 controllers bind the catalog
+    Magnets (bmag/emag 2 T, magnet911, the Kepco-driven gmag) bind the catalog Magnet
+    Family (graduated; presents Regulator; MAG-1, FAM-1); the LakeShore 336/340 controllers bind the catalog
     TemperatureController Family (presents Regulator; TEMP-1). Tables bind the catalog Table
     Family. gmag was misinferred as a "4-ID-K" enclosure from the Kepco vendor
     prefix; it is placed at 4-ID-G pending confirmation (TOPO-3).
   devices:
     - name: Magnet_2T_B
-      family: Magnet                 # loose Family (MAG-1)
+      family: Magnet                 # catalog Family (graduated; presents Regulator, MAG-1)
       pv: {confirm: "Magnet2T (bmag); control PV not in the extracted config (MAG-1)"}
       new: true
       confirm: true
       note: "2 T sample magnet at 4-ID-B (MAG-1)"
     - name: Magnet_2T_E
-      family: Magnet                 # loose Family (MAG-1)
+      family: Magnet                 # catalog Family (graduated; presents Regulator, MAG-1)
       pv: { mrot: "4idb:m20", mx: "4idb:m22", my: "4idb:m21", srot: "4idb:m19", sx: "4idb:m18", sy: "4idb:m17" }
       new: true
       confirm: true
       note: "second 2 T sample magnet at 4-ID-B (emag), with magnet rotate/translate and sample rotate/translate axes from the 6idb-bits snapshot; the field-control PV is still pending (MAG-1)"
     - name: Magnet_9T_H
-      family: Magnet                 # loose Family (MAG-1)
+      family: Magnet                 # catalog Family (graduated; presents Regulator, MAG-1)
       pv: "4idhSoft:"
       new: true
       confirm: true
       enclosure: 4-ID-H
       note: "high-field magnet at 4-ID-H (Magnet911); field range unconfirmed (MAG-1)"
     - name: Magnet_Kepco_G
-      family: Magnet                 # loose Family (MAG-1)
+      family: Magnet                 # catalog Family (graduated; presents Regulator, MAG-1)
       pv: "4idkepco:"
       new: true
       confirm: "station is a guess: the 4idkepco prefix is a Kepco power-supply vendor name, not a station (TOPO-3, MAG-1)"

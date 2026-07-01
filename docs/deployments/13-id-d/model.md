@@ -16,7 +16,7 @@
 
 ## What makes 13-ID-D new
 
-13-ID-D is CORA's first extreme-conditions deployment. The fleet has modelled thermal sample environments (the graduated `TemperatureController`), magnetic ones (the loose `Magnet`), and pump-probe lasers (the loose `Laser`), but never a high-pressure one. 13-ID-D holds the sample in a diamond anvil cell (DAC): the anvils are squeezed by a gas membrane (a PACE5000 pneumatic controller) to the megabar regime, the sample is heated from both sides by two fibre lasers to thousands of kelvin, and the pressure and temperature are read optically in situ (thermal-emission spectroradiometry for temperature; ruby fluorescence, Raman, and Brillouin for pressure). The X-ray probe is otherwise familiar powder and single-crystal diffraction; the novelty is entirely the sample environment.
+13-ID-D is CORA's first extreme-conditions deployment. The fleet has modelled thermal sample environments (the graduated `TemperatureController`), magnetic ones (the graduated `Magnet`), and pump-probe lasers (the loose `Laser`), but never a high-pressure one. 13-ID-D holds the sample in a diamond anvil cell (DAC): the anvils are squeezed by a gas membrane (a PACE5000 pneumatic controller) to the megabar regime, the sample is heated from both sides by two fibre lasers to thousands of kelvin, and the pressure and temperature are read optically in situ (thermal-emission spectroradiometry for temperature; ruby fluorescence, Raman, and Brillouin for pressure). The X-ray probe is otherwise familiar powder and single-crystal diffraction; the novelty is entirely the sample environment.
 
 ## New loose family: the PressureCell
 

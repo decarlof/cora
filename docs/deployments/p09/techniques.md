@@ -23,7 +23,7 @@ P09's MAG endstation applies a 14 T field to the sample and measures the magneti
 
 ## A polarization / magnetism beamline on the 4-ID POLAR vocabulary
 
-P09 is the fleet's resonant-scattering and high-field-magnetism beamline. Its techniques are new to CORA's catalog (no resonant / magnetic Method is earned yet), but they reuse the slugs the APS 4-ID POLAR deployment and the Diamond i06 / i10 beamlines already carry pending, so none forces a new Method now. Crucially, the instrument anatomy reuses the polarization / magnetism Families 4-ID POLAR introduced: the phase retarder binds the allowlisted-loose `PhaseRetarder`, the analyzer `PolarizationAnalyzer`, and the 14 T magnet `Magnet`. P09 is the second consumer of each, the rule-of-three signal toward eventual graduation, recorded on [Model](model.md).
+P09 is the fleet's resonant-scattering and high-field-magnetism beamline. Its techniques are new to CORA's catalog (no resonant / magnetic Method is earned yet), but they reuse the slugs the APS 4-ID POLAR deployment and the Diamond i06 / i10 beamlines already carry pending, so none forces a new Method now. Crucially, the instrument anatomy reuses the polarization / magnetism Families 4-ID POLAR introduced: the phase retarder binds the allowlisted-loose `PhaseRetarder` and the analyzer the allowlisted-loose `PolarizationAnalyzer`, of each of which P09 is the second consumer, the rule-of-three signal toward eventual graduation. The 14 T magnet binds the graduated catalog `Magnet` Family (earned across 4-ID + i10-1 + ID32), a further consumer. All recorded on [Model](model.md).
 
 ## Not modelled yet
 
