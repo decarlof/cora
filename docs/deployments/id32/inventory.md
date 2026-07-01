@@ -4,7 +4,7 @@
 
 This cut models the shared soft X-ray optics, the RIXS spectrometer endstation, and the XMCD high-field-magnet endstation. It is the cross-cutting reference view of the [Source](beamline.md) walk and the [Sample](equipment/sample.md) and [Detector](equipment/detector.md) pages, authored from the same [`beamline.yaml`](https://github.com/xmap/cora/blob/main/deployments/id32/beamline.yaml) descriptor.
 
-Devices bind to a catalog [Family](../../catalog/families.md) wherever one fits. ID32, CORA's first ESRF deployment, **coins no new Family and changes nothing in the catalog**: the APPLE-II undulators reuse `InsertionDevice` and the polarization is a `PseudoAxis` (the i06 / i10 precedent), and the three loose families ID32 pushes to a rule-of-three (`SpectrometerArm`, `Magnet`, `PolarizationAnalyzer`) are held, their graduations deferred to dedicated gated PRs (see [Model](model.md#loose-families-held-at-the-rule-of-three)). Control handles are filled from the BLISS Beacon config (Tango / IcePAP / BLISS addresses); no vendor Models are bound.
+Devices bind to a catalog [Family](../../catalog/families.md) wherever one fits. ID32, CORA's first ESRF deployment, **coins no new Family**: the APPLE-II undulators reuse `InsertionDevice` and the polarization is a `PseudoAxis` (the i06 / i10 precedent). Of the three loose families ID32 pushed to a rule-of-three, `SpectrometerArm` has since graduated into the catalog (SIX + ID32 RIXS/XES + ID28); `Magnet` and `PolarizationAnalyzer` stay held, their graduations deferred to dedicated gated PRs (see [Model](model.md#loose-families-held-at-the-rule-of-three)). Control handles are filled from the BLISS Beacon config (Tango / IcePAP / BLISS addresses); no vendor Models are bound.
 
 ## The Asset tree
 
@@ -22,17 +22,17 @@ Root Asset `ID32` (`tier = Unit`, `facility_code = esrf`); sub-systems nest belo
 | `BeamSlit` | `Device` | Slit | id32-optics | primary / secondary / mono beam-defining slits (BLISS `slits`, hgap / hoffset; IcePAP iceid321) (OPT-2) |
 | `Diffractometer` | `Device` | Goniometer | id32-rixs | 4-circle sample diffractometer (DiffE4CH, E4CH) (DIFF-1) |
 | `ReciprocalSpace` | `Device` | PseudoAxis | id32-rixs | reciprocal-space (hkl) axis over the diffractometer (DIFF-2) |
-| `RixsSpectrometerArm` | `Device` | SpectrometerArm (loose) | id32-rixs | ~5 m dispersive RIXS arm (rixs_spectro, IcePAP iceid324); held at rule-of-three (RIXS-1) |
+| `RixsSpectrometerArm` | `Device` | SpectrometerArm | id32-rixs | ~5 m dispersive RIXS arm (rixs_spectro, IcePAP iceid324); graduated Family, geometry pending (RIXS-1) |
 | `Polarimeter` | `Device` | PolarizationAnalyzer (loose) | id32-rixs | scattered-beam polarimeter on the RIXS arm (iceid324 thpol/...); 3rd consumer, held (POL-2) |
 | `RixsDetector` | `Device` | Camera | id32-rixs | Andor CCD, `id32/limaccds/andor_1` (DET-1) |
 | `Magnet` | `Device` | Magnet (loose) | id32-xmcd | 9 T / 4 T XMCD split-coil magnet, `id32/cryogenic_magnet_ps/xmcd1`; 3rd consumer, held (MAG-1) |
 | `SampleTemperatureController` | `Device` | TemperatureController | id32-xmcd | VTI sample LakeShore 336, `id32/regulation/ls336_hfm` (TEMP-1) |
 | `CryostatDiagnostics` | `Device` | TemperatureController | id32-xmcd | coil / shield diagnostics LakeShore 340, `id32/regulation/ls340_hfm` (TEMP-1) |
-| `XesSpectrometerArm` | `Device` | SpectrometerArm (loose) | id32-xmcd | XES Rowland arm (xes_spectro, IcePAP iceid329); the 2nd arm completing the rule-of-three, held (RIXS-1) |
+| `XesSpectrometerArm` | `Device` | SpectrometerArm | id32-xmcd | XES Rowland arm (xes_spectro, IcePAP iceid329); the 2nd arm that completed the rule-of-three, graduated Family (RIXS-1) |
 | `XesDetector` | `Device` | Camera | id32-xmcd | Andor CCD, `id32/limaccds/andor_2` (DET-1) |
 | `SampleStage` | `Device` | LinearStage | id32-xmcd | XMCD sample stage in the magnet bore (SAMPLE-1) |
 
-Families reused from the catalog: `InsertionDevice`, `PseudoAxis`, `GratingMonochromator`, `Mirror`, `Slit`, `Goniometer`, `Camera`, `TemperatureController`, `LinearStage`. Loose families reused from siblings: `StorageRing` (supply), `SpectrometerArm` (SIX; held at rule-of-three, RIXS-1), `Magnet` (4-ID / i10-1; held, MAG-1), `PolarizationAnalyzer` (4-ID / i10; held, POL-2). No new family is coined and nothing graduates (the three graduations are deferred to dedicated PRs).
+Families reused from the catalog: `InsertionDevice`, `PseudoAxis`, `GratingMonochromator`, `Mirror`, `Slit`, `Goniometer`, `Camera`, `TemperatureController`, `LinearStage`, `SpectrometerArm` (graduated across SIX + ID32 RIXS/XES + ID28). Loose families reused from siblings: `StorageRing` (supply), `Magnet` (4-ID / i10-1; held, MAG-1), `PolarizationAnalyzer` (4-ID / i10; held, POL-2). No new family is coined; of the three ID32 pushed to a rule-of-three, `SpectrometerArm` graduated and the other two stay held (deferred to dedicated PRs).
 
 ## Pending confirmations
 
@@ -49,7 +49,7 @@ Families reused from the catalog: `InsertionDevice`, `PseudoAxis`, `GratingMonoc
 | Slit blade-axis map | `BeamSlit` | `unknown-pending-confirmation` | (OPT-2) |
 | Diffractometer circle roles and Assembly | `Diffractometer` | `unknown-pending-confirmation` | (DIFF-1) |
 | Reciprocal-space partition rule | `ReciprocalSpace` | `unknown-pending-confirmation` | (DIFF-2) |
-| SpectrometerArm geometry and graduation | `RixsSpectrometerArm`, `XesSpectrometerArm` | `unknown-pending-confirmation` | (RIXS-1) |
+| SpectrometerArm geometry (Family graduated) | `RixsSpectrometerArm`, `XesSpectrometerArm` | `unknown-pending-confirmation` | (RIXS-1) |
 | Polarimeter family at n=3 | `Polarimeter` | `unknown-pending-confirmation` | (POL-2) |
 | Magnet fields, ramp, cryogens, graduation | `Magnet` | `unknown-pending-confirmation` | (MAG-1) |
 | LakeShore sensor / loop maps | `SampleTemperatureController`, `CryostatDiagnostics` | `unknown-pending-confirmation` | (TEMP-1) |

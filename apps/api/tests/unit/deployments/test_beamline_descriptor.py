@@ -381,7 +381,6 @@ _ALLOWED_LOOSE_FAMILIES = {
     "Laser": "staged: pump-probe laser (4-ID POLAR); model-vs-hazard open (SAMPLE-1)",
     "Rheometer": "staged: rheometer shear-cell (8-ID); rule-of-three open (SAMPLE-1)",
     "FlightPath": "staged: evacuated XPCS flight path (8-ID); rule-of-three open (XPCS-2)",
-    "SpectrometerArm": "staged: energy-dispersive RIXS arm (SIX); no point-Sensor fit (RIXS-1)",
     "EnergyAnalyzer": "staged: IXS diced crystal energy analyzer; n=1 (ANALYZER-1)",
     "PressureCell": "staged: high-pressure DAC sample environment (13-id-d); n=1 (PRESSURE-1)",
 }
@@ -405,7 +404,6 @@ _PROMOTION_REVIEWED = {
     "PhaseRetarder": "hold: phase-retarder, 4-id + p09; 2nd consumer, graduation-due (POL-1)",
     "PolarizationAnalyzer": "hold: 4-id + i10 + esrf-id32 polarimeter; graduation-due (POL-2)",
     "Magnet": "hold: sample-env magnet, 4-id + i10-1 + esrf-id32; graduation-due (MAG-1)",
-    "SpectrometerArm": "hold: dispersive arm, six + esrf-id32 RIXS+XES; graduation-due (RIXS-1)",
     "SlipRing": "hold: passive feedthrough (tomowise + i-tomcat); passive-deferred, not an Asset",
     "PressureCell": "hold: DAC, 13-id-d + p02; 2nd consumer, graduation-due (PRESSURE-1)",
 }
