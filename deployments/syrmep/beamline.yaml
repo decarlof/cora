@@ -7,7 +7,7 @@
 # sample-to-detector propagation rail. It does absorption, propagation-based
 # phase-contrast, and diffraction-enhanced imaging, plus a clinical breast-CT
 # programme (SYRMA-3D). It is bound to the Elettra Site
-# (deployments/elettra/site.yaml), CORA's EIGHTH Site and its FIRST Elettra
+# (deployments/elettra/site.yaml), CORA's ELEVENTH Site and its FIRST Elettra
 # deployment.
 #
 # STATUS: reverse-engineered, design-phase. Hardware facts (source, optics,
@@ -22,7 +22,7 @@
 # (CTRL-1). Descriptor + docs scaffold; scenarios deferred.
 #
 # WHAT IS NEW: a new Site, and a new controls house-style; NO new Family.
-#   - A wholly NEW Site (Elettra, 8th) re-tests the Site / Federation kernel.
+#   - A wholly NEW Site (Elettra, 11th) re-tests the Site / Federation kernel.
 #   - The first Tango + DonkiOrchestra controls house-style (the rest are EPICS,
 #     Tango / Sardana at MAX IV, or Tango / BLISS / IcePAP at the ESRF). The Tango
 #     floor is shared with ID32, but the orchestration seam is the in-house,
@@ -47,6 +47,9 @@
 # docs/deployments/syrmep/questions.md.
 
 beamline:
+  maturity: model
+  evidence: narrative
+  coverage: full
   name: SYRMEP
   facility: elettra            # Elettra Site (facility_code: elettra)
   sector: "SYRMEP"             # organizational label, not a registered asset today

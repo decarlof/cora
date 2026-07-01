@@ -16,7 +16,7 @@
 
 ## What makes SYRMEP different
 
-SYRMEP is two firsts at once. It is **CORA's eighth Site** (Elettra Sincrotrone Trieste), a re-test of the Site and Federation kernel, and it brings the **first Tango + DonkiOrchestra control house-style** to the fleet. The Tango device floor is shared with the ESRF's ID32, but the orchestration seam is different: SYRMEP runs the in-house, trigger-driven DonkiOrchestra framework (DonkiDirector scheduling DonkiPlayers over a ZeroMQ trigger train, collecting into HDF5), not BLISS and not EPICS. Its science is hard X-ray microtomography: absorption, propagation-based phase-contrast, and diffraction-enhanced imaging, plus a clinical breast-CT programme (SYRMA-3D).
+SYRMEP is two firsts at once. It is **CORA's eleventh Site** (Elettra Sincrotrone Trieste), a re-test of the Site and Federation kernel, and it brings the **first Tango + DonkiOrchestra control house-style** to the fleet. The Tango device floor is shared with the ESRF's ID32, but the orchestration seam is different: SYRMEP runs the in-house, trigger-driven DonkiOrchestra framework (DonkiDirector scheduling DonkiPlayers over a ZeroMQ trigger train, collecting into HDF5), not BLISS and not EPICS. Its science is hard X-ray microtomography: absorption, propagation-based phase-contrast, and diffraction-enhanced imaging, plus a clinical breast-CT programme (SYRMA-3D).
 
 For the modelling, SYRMEP's significance is the opposite of ID32's: where ID32 brought three loose families to a rule-of-three, **SYRMEP coins nothing new in the catalog**. It is a tomography beamline, so it reuses the established imaging spine the 2-BM, FXI, and 7-BM beamlines already share (`RotaryStage`, `LinearStage`, `Camera`, `Scintillator`, `Slit`, `Filter`, `Monochromator`). It is the cleanest possible re-test: a brand-new Site and control house-style on entirely familiar device vocabulary, binding the real catalog tomography Methods.
 
@@ -35,7 +35,7 @@ The deferred parts are recorded on [Model](model.md#deliberately-not-here-yet).
 
 ## Key modelling decisions
 
-- **A new Site and a new control house-style.** Elettra is the 8th Site (`deployments/elettra/site.yaml`); the Tango / DonkiOrchestra handles are modelled as opaque edge strings over the `ControlPort`, the way the MX3 / ID32 heterogeneous-control precedent does, but carried confirm-pending because they are not in public source (`CTRL-1`).
+- **A new Site and a new control house-style.** Elettra is the 11th Site (`deployments/elettra/site.yaml`); the Tango / DonkiOrchestra handles are modelled as opaque edge strings over the `ControlPort`, the way the MX3 / ID32 heterogeneous-control precedent does, but carried confirm-pending because they are not in public source (`CTRL-1`).
 - **No new family; the imaging spine is reused wholesale.** The bending-magnet source is a Supply (the 2-BM precedent); the DCM binds `Monochromator` with the mono / white beam as a per-Asset setting (the 2-BM DMM insert/retract precedent); the rotation stage binds `RotaryStage`; the cameras bind `Camera`; the incident energy is a `PseudoAxis`.
 - **Real catalog tomography Methods, carried pending.** Unlike ID32 (which bound no catalog Method), SYRMEP's Practices reuse the catalog `tomography`, `continuous_rotation_tomography`, `mosaic_tomography`, `dark_field`, `flat_field`, and `center_alignment` Methods directly; the helical, white-beam, and phase-retrieval Methods are not yet in the catalog and render unlinked (`TECH-1`).
 

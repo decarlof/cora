@@ -15,6 +15,7 @@ type-checker's path.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -612,6 +613,232 @@ def test_doc_catalog_markers_reference_real_catalog_models() -> None:
         )
     assert markers_seen >= 1, "no catalog:models markers found to check"
     assert not stale, f"catalog:models markers reference models that do not exist: {stale}"
+
+
+# ---------------------------------------------------------------------------
+# Badge axes: maturity / evidence / coverage.
+#
+# Every beamline declares three orthogonal badge axes (see beamline_descriptor
+# for the vocabularies). These guards keep the vocabulary closed (an enum-mirror
+# per axis, matching the DrawingSystem mirror above) and the combinations logical
+# (the two invariants that must hold for the axes to mean what they claim): there
+# is exactly one live pilot, and live evidence and the pilot maturity are the same
+# beamline. Evidence and coverage are otherwise free of maturity, by design: a
+# roadmap beamline can be modelled from a design report or from narrative facts,
+# and an off-roadmap model can be a partial cut, so no further cross-axis law is
+# asserted (that would encode a coincidence of today's corpus as a rule).
+# ---------------------------------------------------------------------------
+
+_BADGE_MATURITIES = frozenset({"pilot", "design", "model"})
+_BADGE_EVIDENCE = frozenset({"live", "design_report", "controls_config", "narrative"})
+_BADGE_COVERAGES = frozenset({"full", "partial"})
+
+
+def test_badge_axis_vocabularies_are_closed() -> None:
+    # Mirror guard: the schema's frozensets are the source of truth; this pins the
+    # expected vocabulary so a silent widening in the schema fails the build.
+    assert bd.MATURITIES == _BADGE_MATURITIES
+    assert bd.EVIDENCE_TIERS == _BADGE_EVIDENCE
+    assert bd.COVERAGES == _BADGE_COVERAGES
+
+
+@pytest.mark.parametrize("descriptor_path", _beamline_descriptors(), ids=lambda p: p.parent.name)
+def test_every_beamline_declares_valid_badge_axes(descriptor_path: Path) -> None:
+    beamline = bd.load(descriptor_path).beamline
+    assert beamline.maturity in _BADGE_MATURITIES, descriptor_path.parent.name
+    assert beamline.evidence in _BADGE_EVIDENCE, descriptor_path.parent.name
+    assert beamline.coverage in _BADGE_COVERAGES, descriptor_path.parent.name
+
+
+def test_badge_axes_are_logically_consistent() -> None:
+    beamlines = {p.parent.name: bd.load(p).beamline for p in _beamline_descriptors()}
+    pilots = sorted(name for name, b in beamlines.items() if b.maturity == "pilot")
+    live = sorted(name for name, b in beamlines.items() if b.evidence == "live")
+    assert len(pilots) == 1, f"expected exactly one live pilot, got {pilots}"
+    assert pilots == live, (
+        f"pilot maturity and live evidence must be the same beamline: pilot={pilots}, live={live}"
+    )
+
+
+def test_badge_axes_are_not_vacuous() -> None:
+    # Pin a floor so the per-descriptor check cannot pass on an empty glob, and so
+    # a bulk misclassification that flattens an axis to one value is caught: the
+    # fleet spans multiple evidence tiers and carries at least one partial cut.
+    beamlines = [bd.load(p).beamline for p in _beamline_descriptors()]
+    assert len(beamlines) >= 50
+    assert len({b.evidence for b in beamlines}) >= 3
+    assert any(b.coverage == "partial" for b in beamlines)
+
+
+# ---------------------------------------------------------------------------
+# Deployments index drift guard.
+#
+# docs/deployments/index.md is the hand-authored hub: it groups every beamline
+# by Site and carries the three badge cells per row. Hand-authored means it can
+# go stale (81 deployments exist, an earlier index listed only 67) and its badge
+# cells can disagree with the descriptor. These guards make the index self-police
+# without a generator: every deployment appears as a row, and each row's three
+# badge cells equal the beamline's descriptor. They mirror the doc-drift guard
+# test_modeled_devices_are_documented above (the descriptor is the source of
+# truth, the docs must not drift from it).
+# ---------------------------------------------------------------------------
+
+_INDEX = _DOCS_DEPLOYMENTS / "index.md"
+
+# descriptor enum value -> the display word used in the index table cell.
+_MATURITY_CELL = {"pilot": "Pilot", "design": "Design", "model": "Model"}
+_EVIDENCE_CELL = {
+    "live": "Live",
+    "design_report": "Design report",
+    "controls_config": "Controls config",
+    "narrative": "Narrative",
+}
+_COVERAGE_CELL = {"full": "Full", "partial": "Partial"}
+
+
+def _index_rows() -> dict[str, tuple[str, str, str]]:
+    # slug -> (maturity, evidence, coverage) cells parsed from each table row
+    # `| [Label](slug/index.md) | Maturity | Evidence | Coverage | What it is |`.
+    pattern = re.compile(
+        r"\|\s*\[[^\]]+\]\(([^/]+)/index\.md\)\s*\|"
+        r"\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|"
+    )
+    rows: dict[str, tuple[str, str, str]] = {}
+    for line in _INDEX.read_text(encoding="utf-8").splitlines():
+        match = pattern.match(line.strip())
+        if match:
+            rows[match.group(1)] = (match.group(2), match.group(3), match.group(4))
+    return rows
+
+
+def test_every_deployment_is_listed_in_index() -> None:
+    listed = set(_index_rows())
+    deployments = {p.parent.name for p in _beamline_descriptors()}
+    missing = sorted(deployments - listed)
+    stale = sorted(listed - deployments)
+    assert not missing, f"deployments absent from docs/deployments/index.md: {missing}"
+    assert not stale, f"index rows with no deployment directory: {stale}"
+
+
+def test_index_badge_cells_match_descriptor() -> None:
+    rows = _index_rows()
+    mismatched: list[str] = []
+    for path in _beamline_descriptors():
+        slug = path.parent.name
+        beamline = bd.load(path).beamline
+        expected = (
+            _MATURITY_CELL[beamline.maturity],
+            _EVIDENCE_CELL[beamline.evidence],
+            _COVERAGE_CELL[beamline.coverage],
+        )
+        if rows.get(slug) != expected:
+            mismatched.append(f"{slug}: index {rows.get(slug)} != descriptor {expected}")
+    assert not mismatched, (
+        f"index badge cells disagree with the descriptor (regenerate the row): {mismatched}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Site-ordinal drift guard.
+#
+# Deployment prose repeatedly claims "CORA's Nth Site" for the facility a
+# beamline sits on. Because each page was written when the fleet was a different
+# size, these ordinals drifted: four separate facilities once all claimed
+# "eighth Site". The canonical order is the sequence in which CORA took each Site
+# on, pinned here as the single source of truth. This guard scans every
+# deployment's docs and descriptor for an "CORA's <ordinal> Site" claim and
+# fails if the ordinal word does not match the facility's canonical position, so
+# a future beamline cannot reintroduce a stale count. Only Site-level ordinals
+# are mechanized (they have one right answer); technique / per-facility-sequence
+# ordinals are phrased without a hard count on purpose.
+# ---------------------------------------------------------------------------
+
+# Canonical Site order: the sequence CORA took each facility on. Position i (1-based)
+# is the ordinal every "CORA's Nth Site" claim about that facility must use.
+_CANONICAL_SITE_ORDER = (
+    "aps",
+    "maxiv",
+    "diamond",
+    "nsls2",
+    "slac",
+    "as",
+    "esrf",
+    "sirius",
+    "alba",
+    "als",
+    "elettra",
+    "nsrrc",
+    "petra-iii",
+    "psi",
+)
+
+_ORDINAL_WORDS = {
+    1: {"first"},
+    2: {"second"},
+    3: {"third"},
+    4: {"fourth"},
+    5: {"fifth"},
+    6: {"sixth"},
+    7: {"seventh"},
+    8: {"eighth"},
+    9: {"ninth", "9th"},
+    10: {"tenth"},
+    11: {"eleventh", "11th"},
+    12: {"twelfth"},
+    13: {"thirteenth"},
+    14: {"fourteenth"},
+}
+
+# "CORA's <ordinal> Site", "the <ordinal> Site CORA models", "is the <ordinal> Site",
+# "<Facility> is the <ordinal> Site", "<Facility>, the <ordinal> Site", and the
+# "Nth)" short form used in a few page bullets (e.g. "ALBA, the 9th)").
+_SITE_ORDINAL_RE = re.compile(
+    r"(?:the|is the|its|CORA's)\s+"
+    r"(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|"
+    r"eleventh|twelfth|thirteenth|fourteenth|9th|11th)\s+Site",
+    re.IGNORECASE,
+)
+
+
+def _facility_ordinal(facility_code: str) -> int:
+    return _CANONICAL_SITE_ORDER.index(facility_code) + 1
+
+
+def test_canonical_site_order_covers_every_facility() -> None:
+    # Anchor: the pinned order must list exactly the facilities that have a
+    # site.yaml, so a new Site cannot be added without placing it in the order.
+    assert set(_CANONICAL_SITE_ORDER) == _site_facility_codes()
+
+
+def test_site_ordinal_claims_match_canonical_order() -> None:
+    # For every deployment, its facility fixes the one correct Site ordinal; any
+    # "CORA's Nth Site" claim in its docs or descriptor must use that word.
+    wrong: list[str] = []
+    for descriptor_path in _beamline_descriptors():
+        deployment = descriptor_path.parent.name
+        facility = bd.load(descriptor_path).beamline.facility
+        if facility is None or facility not in _CANONICAL_SITE_ORDER:
+            continue
+        expected_n = _facility_ordinal(facility)
+        expected_words = _ORDINAL_WORDS[expected_n]
+        site_yaml = _DEPLOYMENTS / facility / "site.yaml"
+        sources = [
+            descriptor_path,
+            site_yaml,
+            *sorted((_DOCS_DEPLOYMENTS / deployment).rglob("*.md")),
+        ]
+        for source in sources:
+            if not source.exists():
+                continue
+            for claim in _SITE_ORDINAL_RE.findall(source.read_text(encoding="utf-8")):
+                if claim.lower() not in expected_words:
+                    wrong.append(
+                        f"{source.relative_to(_REPO_ROOT)}: claims '{claim} Site' but "
+                        f"{facility} is CORA's #{expected_n} Site"
+                    )
+    assert not wrong, (
+        "stale Site ordinals (canonical order in _CANONICAL_SITE_ORDER):\n" + "\n".join(wrong)
+    )
 
 
 def test_malformed_descriptor_raises(tmp_path: Path) -> None:
