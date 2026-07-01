@@ -16,7 +16,7 @@
 
 ## What makes 4-ID different
 
-4-ID is CORA's first non-tomography APS deployment. It is unlike the 2-BM, 7-BM, and 32-ID imaging beamlines in three ways:
+4-ID is CORA's first polarization and magnetic-scattering deployment. It is unlike the 2-BM, 7-BM, and 32-ID imaging beamlines in three ways:
 
 - **Polarization control.** Three diamond phase retarders set the X-ray polarization state, the capability 4-ID is built around. They bind the catalog `PhaseRetarder` Family (earned across 4-ID / P09 / P22).
 - **Magnetic scattering.** Superconducting sample magnets (2 T at 4-ID-B, a high-field magnet at 4-ID-H) and low-temperature sample environments drive resonant magnetic scattering. New device classes to CORA: `Magnet` (loose) and `TemperatureController` (since graduated to a catalog Family presenting `Regulator`).
