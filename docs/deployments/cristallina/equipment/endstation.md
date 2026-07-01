@@ -2,7 +2,7 @@
 
 *The Cristallina endstation: the I0 chamber, the DM1 and DM2 diffractometers, the DilSc dilution-fridge vector magnet, and the Cristallina-MX sample stage. Design-phase, with the `slic`-derived handles recorded.*
 
-The Cristallina experiment hutch is where the focused beam meets the sample and the time-resolved diffraction happens, in a low-temperature, high-magnetic-field environment. It is the most novel sample environment in the PSI set, and every part of it folds into an existing CORA shape: the diffractometers into a graduated Assembly, the magnet into a held loose family, the thermometry into a graduated Family.
+The Cristallina experiment hutch is where the focused beam meets the sample and the time-resolved diffraction happens, in a low-temperature, high-magnetic-field environment. It is the most novel sample environment in the PSI set, and every part of it folds into an existing CORA shape: the diffractometers into a graduated Assembly, the magnet into the graduated `Magnet` Family, the thermometry into a graduated Family.
 
 ## The diffractometers
 

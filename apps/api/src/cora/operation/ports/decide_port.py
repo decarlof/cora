@@ -72,6 +72,7 @@ exactly as ControlPort earned its registry from a third substrate and
 ComputePort deferred its registry to a second.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
@@ -216,6 +217,26 @@ class DecideEvidenceRejectedError(Exception):
         self.reason = reason
 
 
+class DecideColdStartError(DecideEvidenceRejectedError):
+    """The decider refused because the history is too small YET, not wrong.
+
+    A TRANSIENT subtype of `DecideEvidenceRejectedError`: the brain is
+    reachable and the request is well-formed, but there are too few usable
+    observations to act on (a GP needs seed points before a fit is
+    meaningful). More evidence fixes it. Distinct from a permanent
+    `DecideEvidenceRejectedError` (an unsupported objective kind, a missing
+    target, a non-continuous axis), which more evidence never fixes.
+
+    The distinction is load-bearing for `StagedDecidePort`: it catches THIS
+    subtype to fall back to its seeder for another point, keeping the loop
+    accreting usable observations, while it lets a permanent rejection
+    propagate so a misconfigured objective ends the run instead of seeding
+    forever. Being a subclass, it is still folded by the conduct loop's
+    `Decide*Error` handling and still matched by callers catching the base
+    `DecideEvidenceRejectedError`.
+    """
+
+
 class DecideAdviceMalformedError(Exception):
     """The decider returned advice that violates the port contract.
 
@@ -258,6 +279,16 @@ class SteeringAdvice:
     shared `DecisionConfidenceSource` so a recorded confidence carries the
     same ISO-42001 derivation label whatever the home.
 
+    `diagnostics` is an OPAQUE, adapter-supplied map of named scalar
+    breadcrumbs the caller may record for audit ("why did this brain advise
+    that point") but never interprets or branches on. It is the numeric
+    analogue of `Measurement.quality_detail`: the port defines the channel,
+    the adapter owns the contents, and their meaning stays caged in the
+    adapter. A learning brain populates it with the fitted model's summary
+    scalars (the keys are the adapter's private vocabulary); a static brain
+    leaves it None. Kept deliberately generic so the port surface names no
+    optimizer internals: it is a `Mapping[str, float]`, nothing more.
+
     Self-validating at construction (raising `DecideAdviceMalformedError`)
     so a malformed brain answer cannot enter the loop: confidence stays in
     [0.0, 1.0] (NaN rejected), the rationale fits `REASONING_MAX_LENGTH`,
@@ -271,6 +302,7 @@ class SteeringAdvice:
     confidence_source: DecisionConfidenceSource | None = None
     alternatives: tuple[str, ...] = ()
     model_ref: str | None = None
+    diagnostics: Mapping[str, float] | None = None
 
     def __post_init__(self) -> None:
         if self.verdict is SteeringVerdict.MEASURE and self.next_point is None:
@@ -394,6 +426,7 @@ __all__ = [
     "AdviceAuditFields",
     "DecideAccessDeniedError",
     "DecideAdviceMalformedError",
+    "DecideColdStartError",
     "DecideEvidenceRejectedError",
     "DecideNotAvailableError",
     "DecidePort",

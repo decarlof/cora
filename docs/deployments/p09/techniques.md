@@ -21,9 +21,9 @@ P09's MAG endstation applies a 14 T field to the sample and measures the magneti
 | Magnetic scattering | `magnetic_scattering` | scattering in the 14 T high-field magnet; reuses the `magnetic_scattering` slug, a further consumer (`TECH-1`) |
 | X-ray magnetic circular / linear dichroism | `xmcd` | dichroism in the 14 T magnet with the phase retarder setting polarization; reuses the `xmcd` slug 4-ID / i06 / i10 share, a further consumer (`TECH-1`) |
 
-## A polarization / magnetism beamline on the 4-ID POLAR vocabulary
+## A polarization / magnetism beamline on the 4-ID vocabulary
 
-P09 is the fleet's resonant-scattering and high-field-magnetism beamline. Its techniques are new to CORA's catalog (no resonant / magnetic Method is earned yet), but they reuse the slugs the APS 4-ID POLAR deployment and the Diamond i06 / i10 beamlines already carry pending, so none forces a new Method now. Crucially, the instrument anatomy reuses the polarization / magnetism Families 4-ID POLAR introduced: the phase retarder binds the allowlisted-loose `PhaseRetarder` and the analyzer the allowlisted-loose `PolarizationAnalyzer`, of each of which P09 is the second consumer, the rule-of-three signal toward eventual graduation. The 14 T magnet binds the graduated catalog `Magnet` Family (earned across 4-ID + i10-1 + ID32), a further consumer. All recorded on [Model](model.md).
+P09 is the fleet's resonant-scattering and high-field-magnetism beamline. Its techniques are new to CORA's catalog (no resonant / magnetic Method is earned yet), but they reuse the slugs the APS 4-ID deployment and the Diamond i06 / i10 beamlines already carry pending, so none forces a new Method now. Crucially, the instrument anatomy reuses the polarization / magnetism Families 4-ID introduced: the phase retarder binds the catalog `PhaseRetarder` and the analyzer the catalog `PolarizationAnalyzer` (graduated across 4-ID / i10 / ID32 / P09, presenting Positioner), while the 14 T magnet binds the graduated catalog `Magnet` (earned across 4-ID + i10-1 + ID32), a further consumer. For `PhaseRetarder`, P09 was the rule-of-three signal (with P22) that earned it into the catalog. All recorded on [Model](model.md).
 
 ## Not modelled yet
 

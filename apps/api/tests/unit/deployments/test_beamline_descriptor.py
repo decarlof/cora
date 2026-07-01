@@ -374,13 +374,11 @@ _ALLOWED_LOOSE_FAMILIES = {
     "Photodiode": "staged: PIN photodiode, Sensor Role; Family-vs-Sensor open (RAD-1)",
     "Baffle": "staged: passive baffle inside the 2-BM SafetyStack; review name/role",
     "Screen": "staged: motorized phosphor diagnostic flag (2-BM, FLAG-1); review name-vs-behavior",
-    "PhaseRetarder": "staged: polarization phase-retarder (4-ID); rule-of-three open (POL-1)",
-    "PolarizationAnalyzer": "staged: polarization analyzer (4-ID); rule-of-three open (POL-2)",
     "Laser": "staged: pump-probe laser (4-ID POLAR); model-vs-hazard open (SAMPLE-1)",
     "Rheometer": "staged: rheometer shear-cell (8-ID); rule-of-three open (SAMPLE-1)",
     "FlightPath": "staged: evacuated XPCS flight path (8-ID); rule-of-three open (XPCS-2)",
     "EnergyAnalyzer": "staged: IXS diced crystal energy analyzer; n=1 (ANALYZER-1)",
-    "PressureCell": "staged: high-pressure DAC sample environment (13-id-d); n=1 (PRESSURE-1)",
+    "PressureCell": "staged: high-pressure DAC sample environment (13-id); n=1 (PRESSURE-1)",
 }
 
 # The subset of loose families that is conceptually a Supply observation (a
@@ -398,10 +396,8 @@ _PROMOTION_REVIEWED = {
     "Screen": "hold: phosphor beam-viewing screen (2-BM, BMM); fold-vs-promote open (FLAG-1)",
     "Laser": "hold: pump-probe laser model-vs-hazard open (4-id + lcls-mfx; SAMPLE-1)",
     "Backlight": "hold: sample-illumination fold-vs-promote open (i03 + i24 + fmx + i19; DET-1)",
-    "PhaseRetarder": "hold: phase-retarder, 4-id + p09; 2nd consumer, graduation-due (POL-1)",
-    "PolarizationAnalyzer": "hold: 4-id + i10 + esrf-id32 polarimeter; graduation-due (POL-2)",
     "SlipRing": "hold: passive feedthrough (tomowise + i-tomcat); passive-deferred, not an Asset",
-    "PressureCell": "hold: DAC, 13-id-d + p02; 2nd consumer, graduation-due (PRESSURE-1)",
+    "PressureCell": "hold: DAC, 13-id + p02; 2nd consumer, graduation-due (PRESSURE-1)",
 }
 
 # Catalog families bound by no deployment device. Symmetric to the orphan-model
