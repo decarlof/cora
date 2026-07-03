@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from cora.equipment.aggregates.assembly.state import SlotCardinality
+from cora.equipment.aggregates.family import SEED_FAMILIES
 from cora.equipment.aggregates.family.affordance import Affordance
 from cora.equipment.aggregates.model.state import ManufacturerIdentifierType
 from cora.equipment.aggregates.role import SEED_ROLES
@@ -58,13 +59,14 @@ def _vals(items: Any) -> set[str]:
 
 def test_catalog_loads_and_validates() -> None:
     cat = cd.load(_CATALOG)
-    assert len(cat.roles) == 5
+    assert len(cat.roles) == 6
     assert {r.name for r in cat.roles} == {
         "Detector",
         "Positioner",
         "Controller",
         "Sensor",
         "Regulator",
+        "Shutter",
     }
     # lower bounds, not exact: additive catalog edits should not break this test
     # (only roles == 5 is exact, because it is drift-guarded against SEED_ROLES).
@@ -136,6 +138,27 @@ def test_roles_match_seed_roles() -> None:
         assert set(role.optional_affordances) == _vals(seed.optional_affordances)
         assert set(role.produces) == _vals(seed.produces)
         assert set(role.consumes) == _vals(seed.consumes)
+
+
+def test_families_match_seed_families() -> None:
+    """Catalog `families:` is the code's SEED_FAMILIES (name-keyed graduation).
+
+    Mirrors `test_roles_match_seed_roles`: the graduated family roster,
+    each family's affordance set, and each family's presented Roles must
+    not drift between catalog.yaml (docs) and the code seed. Affordances
+    are authored per Role cluster in batches; both sides move together.
+    """
+    cat = cd.load(_CATALOG)
+    authored = {f.name: f for f in cat.families}
+    seeded = {f.name.value: f for f in SEED_FAMILIES}
+    assert set(authored) == set(seeded)
+
+    role_name_by_id = {role.id: role.name.value for role in SEED_ROLES}
+    for name, seed in seeded.items():
+        fam = authored[name]
+        assert set(fam.affordances) == _vals(seed.affordances), f"{name} affordance drift"
+        seed_role_names = {role_name_by_id[rid] for rid in seed.presents_as}
+        assert set(fam.presents_as) == seed_role_names, f"{name} presents_as drift"
 
 
 def test_renders_all_catalog_pages() -> None:

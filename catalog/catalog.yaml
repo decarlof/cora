@@ -9,13 +9,18 @@
 #   - the closed affordance / executor-shape vocabularies are validated against
 #     code-mirrored frozensets in scripts/catalog_descriptor.py (enum-equality
 #     tested), never re-authored here.
-#   - families, capabilities, methods, models have no global code seed; this
-#     file is their consolidated source, guarded by the round-trip test.
+#   - families MIRROR the code's SEED_FAMILIES; a drift-guard test asserts
+#     equality (the graduated device-class roster), same as roles.
+#   - capabilities, methods, models have no global code seed; this file is
+#     their consolidated source, guarded by the round-trip test.
 #
-# Families ship with no affordances on purpose: an affordance is a Role concern
-# (required_affordances live on the roles below), and a Family declares which
-# Roles it presents_as. Per-device settings and vendor bindings live on the
-# beamline page, not here.
+# An affordance is a Family property: it declares what the device CAN DO at the
+# physics layer. A Role declares required_affordances (the contract), and a
+# Family may present a Role only when its own affordances cover that Role's
+# required set (the add_family_presents_as gate). Families ship with empty
+# affordances today; affordances and presents_as are authored in later thematic
+# batches (populate SEED_FAMILIES and this file together). Per-device settings
+# and vendor bindings live on the beamline page, not here.
 
 roles:
   - name: Detector
@@ -31,7 +36,7 @@ roles:
     produces: [EncoderPosition]
     consumes: [PositionCommand]
   - name: Controller
-    docstring: "Generates or routes signals (motion, timing) that govern subordinate Assets. Satisfying Families are the empty-Affordances <Domain>Controller leaves (MotionController, TimingController). The Controller does NOT itself perform motion / imaging; subordinate Assets do, under its supervision."
+    docstring: "Generates or routes signals (motion, timing) that govern subordinate Assets. Satisfying Families are the <Domain>Controller leaves (MotionController, TimingController); they carry signal-governance affordances (Identifiable, status Reportable, and Pulsing for a trigger generator), NOT the operational motion / imaging affordances of the subordinate Assets they supervise. The Controller does NOT itself perform motion / imaging; subordinate Assets do, under its supervision."
     required_affordances: [Identifiable]
     optional_affordances: [Reportable, Pulsing]
     produces: [ControlOut]
@@ -48,25 +53,59 @@ roles:
     optional_affordances: [PIDControllable, Coolable, Reportable]
     produces: [Reading]
     consumes: [Setpoint]
+  - name: Shutter
+    docstring: "Gates the beam open or closed on operator command. Satisfying Families carry the Shutterable affordance (the Shutter Family: PSS, station, and hutch shutters). Graduated when three Methods needed to command a shutter as a bound contract (dark_field, flat_field, xpcs); distinct from a Positioner (it gates rather than positions a continuous axis) and from a passive BeamStop (which absorbs the beam permanently rather than gating it under command)."
+    required_affordances: [Shutterable]
+    optional_affordances: [Triggerable, Reportable]
+    produces: [BeamGateState]
+    consumes: [BeamGateCommand]
 
 families:
-  # Defined families today. Affordances intentionally empty (a Role concern).
+  # The graduated device-class roster (mirrors SEED_FAMILIES). Affordances +
+  # presents_as are authored per Role cluster; a family's affordances must
+  # cover each presented Role's required_affordances (the add_family_presents_as
+  # gate). Batch 1 (Positioner cluster) is populated; remaining families stay
+  # empty until their batch lands.
   - name: RotaryStage
+    affordances: [Homeable, Limitable, Rotatable, Following, Marking]
+    presents_as: [Positioner]
   - name: LinearStage
+    affordances: [Homeable, Limitable, Translatable]
+    presents_as: [Positioner]
   - name: TiltStage
+    affordances: [Homeable, Limitable, Rotatable]
+    presents_as: [Positioner]
     note: "Limited-range rotational tilt-stage Family (a goniometer). Distinct from RotaryStage (it carries no PSO Following/Marking for fly-scans) and from LinearStage (the motion is rotational, not translation). 2-BM: the LaminographyPitch Kohzu goniometer, modelled in the SampleTower Assembly."
   - name: Camera
+    affordances: [Imageable, Binnable, Coolable, Triggerable, Streamable, Recording]
+    presents_as: [Detector]
   - name: Scintillator
+    affordances: [Consumable]
+    note: "Passive X-ray-to-light converter Family (a scintillator / phosphor screen, e.g. LuAG:Ce, GGG, YAG). Not a detector: it converts the X-ray beam to visible light that a Camera then images, so a composed scintillator-relay Assembly presents the Detector Role, NOT the bare Family (the Detector Role's multi-Family disjunction accepts either the direct-detection Camera path or the composed-Assembly path). Consumable: its material, thickness, and lot are operationally tracked across swaps, but it has no command surface (no Role)."
   - name: EnergyDispersiveSpectrometer
+    affordances: [Reportable, Triggerable, Streamable]
+    presents_as: [Sensor]
     note: "Energy-dispersive X-ray detector Family: resolves photon energy per event to give a spectrum, from which element maps or absorption edges are fit downstream. Presents_as Sensor (it produces a scalar or short-vector Reading per point, not a 2D Frame, so it is distinct from Camera and the Detector Role). One Family spans the silicon-drift and germanium variants; channel count and vendor are per-Asset settings. 2-ID: the 2-ID-D fluorescence detector (XRF mapping). 7-BM: the germanium energy-dispersive-diffraction detector. Earned in once two deployments shared it; the name deliberately avoids the reserved Detector Role noun (a detector is a Role an Asset plays, not its Family)."
   - name: FluxMonitor
+    affordances: [Reportable]
+    presents_as: [Sensor]
     note: "Beam-flux / intensity monitor Family: measures incident or transmitted beam intensity as a scalar (ion chamber, X-ray beam-position monitor read as flux, four-channel picoammeter). Presents_as Sensor (a scalar Reading, not a 2D Frame, so distinct from Camera and the Detector Role); and distinct from the position-measuring PositionMonitor Family by what it measures, flux not centroid. One Family spans the ion chambers, XBPMs, and TetrAMM picoammeters; incident-vs-transmitted placement is a per-Asset setting. i22: the I0 / It ion chambers. i03: the Flux readout and the IPin ion chamber. i15-1: the JBPM TetrAMM. Earned in once three deployments shared it (the EnergyDispersiveSpectrometer precedent: a Sensor-presenting measurement Family graduates by what it measures)."
   - name: PositionMonitor
+    affordances: [Reportable]
+    presents_as: [Sensor]
     note: "Beam-position monitor Family: measures the transverse position (centroid) of the beam as a short vector, typically from a four-quadrant or segmented pickup (a quadrant BPM / QBPM, an X-ray BPM read for position, or a TetrAMM / picoammeter read for centroid rather than flux). Presents_as Sensor (a scalar or short-vector Reading, not a 2D Frame, so distinct from Camera and the Detector Role). The measured-quantity sibling of FluxMonitor: FluxMonitor measures beam flux / intensity, PositionMonitor measures beam centroid / position (the same device electronics can be read either way, so the discriminator is the measured quantity, the FluxMonitor / EnergyDispersiveSpectrometer precedent of a Sensor Family earned by what it measures). The 2-word <quantity>Monitor name mirrors FluxMonitor so the sibling set scans as one family. Graduated across the wide fleet that shares it: APS 4-ID / 8-ID / 9-ID, NSLS-II ISS / FMX / CDI / CHX / SMI / SRX / ISR / LIX, and the imaging and MX beamlines that carry a QBPM; beam-center calibration and quadrant-vs-segmented pickup are a per-Asset settings or bound-Model difference, not a Family split. Distinct too from the loose Diagnostic family (arrival-time and photon-spectrum monitors, which measure timing / spectrum, not position; those stay loose pending their own rule-of-three, DIAG-1)."
   - name: Shutter
+    affordances: [Shutterable]
+    presents_as: [Shutter]
   - name: Hexapod
+    affordances: [Homeable, Limitable, Posable]
+    presents_as: [Positioner]
   - name: MotionController
+    affordances: [Identifiable, Reportable]
+    presents_as: [Controller]
   - name: TimingController
+    affordances: [Identifiable, Pulsing, Reportable]
+    presents_as: [Controller]
     note: "Hardware timing-signal generation and distribution (triggers, gates, sync pulses); presents_as Controller, which carries Pulsing. Anchored at 2-BM by Timing (the softGlueZynq Zynq FPGA box). Substrate (softGlue, FPGA, Zynq) stays out of the name and lives in settings or the bound Model."
   - name: Objective
     note: "Per-lens identity inside the Microscope Assembly."
@@ -77,8 +116,11 @@ families:
   - name: GenericProbe
     note: "APS facility-scope template, an abstract detector probe-chain."
   - name: Table
+    affordances: [Homeable, Limitable, Translatable]
+    presents_as: [Positioner]
     note: "Support/positioning table Family (the hutch optical tables). One Family spans the 4-DOF sample table (pure translation), the 6-DOF detector table (six virtual axes on record 2bmb:table3), and the mirror table (in operational use, its X axes driven by the energy-change IOC for stripe selection, STAGE-7); the axis set is a per-Asset settings difference, not a Family split. 'Optical' is deliberately not in the name (it would name the contents, not the table's own nature; the OpticalHousing -> Housing precedent). Instances qualify at the Asset layer: SampleTable / DetectorTable / MirrorTable."
   - name: Slit
+    affordances: [Limitable]
     note: "Beam-defining four-blade slit Family (four independently-driven blades forming a variable horizontal/vertical opening). 2-BM: ConditioningSlit (A-station L3-20) and SampleSlit (B-station)."
   - name: Aperture
     note: "Patterned beam-shaping aperture Family: a fixed-pattern mask positioned in the beam as a unit. Distinct from Slit (a variable opening defined by four driven blades) and from a passive Mask (a fixed beam-defining opening that does not move); the discriminator is the element's nature (a fixed code pattern), not that it is driven. 2-BM: the coded aperture for compressive-sensing tomography, fine-positioned by ApertureFineDrive."
@@ -91,10 +133,13 @@ families:
   - name: Collimator
     note: "Passive beam-collimating Family: a fixed element that limits the transmitted fan to the beamline acceptance and absorbs the bremsstrahlung halo. Distinct from BeamStop (which absorbs the full beam rather than trimming it), from Slit (a variable driven opening), and from Mask / Aperture (which define the beam-shaping opening). 2-BM: the SafetyStack Collimator. 19-BM: the UpstreamCollimator and DownstreamCollimator (lead). Earned in once two deployments shared it; beam-effect modelling stays deferred (the passive beam-path tier)."
   - name: Mirror
+    affordances: [Bendable]
     note: "Beam-steering grazing-incidence mirror optic Family. 2-BM: the Y3-30 mirror (distinct from its MirrorTable support, which is Family Table)."
   - name: Monochromator
+    affordances: [Indexable]
     note: "Energy-selecting optic Family; at 2-BM the double-multilayer monochromator (DMM). The energy-change IOC drives its Bragg arms + M2 vertical offset per energy; inserting it picks the beam energy, pink-beam operation bypasses it. Distinct from GratingMonochromator (a diffraction-grating soft X-ray mono): this Family is the crystal / multilayer Bragg monochromator."
   - name: GratingMonochromator
+    affordances: [Indexable]
     note: "Soft X-ray plane-grating monochromator (PGM) Family: selects energy with an interchangeable diffraction grating and a premirror held at a fixed-focus c-value (cff), with the exit slit setting the resolution. Distinct from Monochromator (a crystal / multilayer Bragg optic): a PGM has no Bragg crystal and disperses with a grating, so the line-density / cff / grating-translation controls and exit-slit resolution are a different optic, not a settings variant. Earned in once two deployments shared it, the soft X-ray beamlines SIX (NSLS-II 2-ID, the RIXS PGM, three gratings 500 / 1200 / 1800 l/mm) and CSX (NSLS-II 23-ID, the VLS-PGM, 200-2200 eV), and reused by ESM (NSLS-II 21-ID); grating line density and energy range are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Monochromator precedent)."
   - name: Condenser
     note: "Beam-condensing optic Family for full-field transmission X-ray microscopy: shapes the monochromatic beam onto the sample (a capillary or a condenser zone plate). Distinct from the ZonePlate (the imaging objective downstream of the sample) and from a Mirror (grazing-incidence steering); the discriminator is its role, conditioning the illumination onto the sample. 32-ID: the Condenser (capillary or condenser zone plate, type unconfirmed). FXI: the clens condenser. Earned in once two deployments shared it; per-Asset optical parameters live at the Asset layer."
@@ -103,38 +148,64 @@ families:
   - name: PhaseRing
     note: "Zernike phase-ring optic Family for full-field transmission X-ray microscopy: a phase plate in the back focal plane that renders phase contrast as amplitude contrast, inserted or retracted per imaging mode. Distinct from the ZonePlate (the imaging objective) and the Condenser (the illumination optic); the discriminator is its phase-contrast role. 32-ID: the PhaseRing. FXI: the phase_ring. Earned in once two deployments shared it; the inserted/retracted state is a per-Asset setting."
   - name: Transfocator
+    affordances: [Indexable]
     note: "Compound-refractive-lens (CRL) transfocator Family: a beam-focusing optic of stacked refractive lenslets, individually insertable to set the focal length, that focuses the beam refractively. Distinct from Mirror (reflective grazing-incidence focusing), ZonePlate (diffractive focusing), and Condenser (illumination conditioning onto the sample); the discriminator is refractive compound-lens focusing. Graduated across eight deployments: APS 4-ID / 8-ID / 9-ID, Diamond i22, NSLS-II CHX / SMI / IXS, and SLAC LCLS-MFX; lens material, lenslet count, and fixed-versus-adjustable mounting are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Table precedent). A kinoform (a single profiled refractive lens, named at CHX but not modelled as a device) is a distinct refractive optic, not a compound-lens transfocator, and would be its own question if a deployment binds it."
   - name: PhaseRetarder
+    affordances: [Homeable, Limitable, Rotatable]
+    presents_as: [Positioner]
     note: "Polarization phase-retarder optic Family: a diamond crystal (or a stack of them) operated near a Bragg reflection that converts the incident linear polarization to a selectable state (circular or rotated-linear), its retardation set by the crystal angle offset and tracked with energy. Presents the Positioner Role (the motorized theta / x / y circles that set and track the retardation). Distinct from Monochromator (a Bragg optic that selects energy, not polarization state) and from PolarizationAnalyzer (the post-sample optic that measures the scattered-beam polarization rather than setting the incident state); the discriminator is setting the incident polarization state upstream of the sample. Graduated on the rule-of-three across APS 4-ID POLAR (three diamond phase-retarder stages, energy-tracking) and PETRA III P09 and P22 (the shared P09 phase-retarder circles); crystal count, diamond-versus-other material, and fixed-versus-energy-tracked mounting are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Transfocator precedent). The post-sample polarization analyzer stays the distinct loose PolarizationAnalyzer Family pending its own rule-of-three (POL-2)."
   - name: Filter
+    affordances: [Attenuable]
     note: "Discrete absorber-foil changer Family; at 2-BM the C / Al foil paddles that attenuate and condition the white beam (the upstream paddle 2bma:m17 is the operational selector; the downstream 2bma:m18 is currently Faulted)."
   - name: InsertionDevice
     note: "Source-defining insertion-device Family (the storage-ring straight-section source). One Family spans the cryo-undulator and the wiggler; the device type and its gap / field parameters are a per-Asset settings difference, not a Family split (the Table precedent). TomoWISE: the CPMU14 cryogenic permanent-magnet undulator and the 3T3PW three-pole wiggler, switchable per operation mode. A bending-magnet source (2-BM) is not an insertion device; it stays modelled loosely as the beam source, not through this Family."
   - name: Goniometer
+    affordances: [Homeable, Limitable, Rotatable, Translatable]
+    presents_as: [Positioner]
     note: "Multi-axis sample-orientation goniometer Family: omega / chi / phi rotation plus the x / y / z sample-centring translations, with centre-of-rotation control. The MX micro-goniometer. Distinct from RotaryStage (a single tomographic rotation axis that carries PSO fly-scan Following / Marking, which the goniometer does not) and from TiltStage (a limited-range tilt with no primary rotation axis); the discriminator is the multi-axis crystal-orientation role. Graduated from pending on i03 (the Smargon), CORA's first canonical-goniometer deployment; chi-vs-kappa and axis-count are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Table precedent). The composed multi-stage scattering diffractometer (4-ID / 8-ID, the Diffractometer Assembly) binds one Goniometer Asset for its sample-orientation circles."
   - name: Manipulator
+    affordances: [Homeable, Limitable, Translatable, Rotatable]
+    presents_as: [Positioner]
     note: "Ultra-high-vacuum multi-axis sample manipulator Family: a serial stack of translations and rotations that positions a sample inside a UHV chamber, typically with cryogenic cooling. Distinct from Hexapod (a parallel-kinematic six-strut positioner), from Goniometer (the crystal-orientation circles for diffraction), and from a plain LinearStage / RotaryStage (a single in-air motion axis); the discriminator is the UHV serial-stack sample-environment role. Earned in once two deployments shared it, the soft X-ray beamlines SIX (NSLS-II 2-ID, the cryostat x/y/z/theta manipulator) and ESM (NSLS-II 21-ID, the LT six-axis cryo manipulator x/y/z/Rx/Ry/Rz); axis count, cryo range, and load-lock transfer are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Goniometer precedent)."
   - name: ElectronAnalyzer
+    affordances: [Imageable, Triggerable, Streamable]
+    presents_as: [Detector]
     note: "Hemispherical electron energy analyzer Family: a photoemission spectrometer that disperses photoelectrons by kinetic energy (and, in angle-resolved mode, emission angle) over a window set by the pass energy and lens mode. Presents the Detector Role (it acquires the spectrum), but distinct from the photon detectors (Camera, the energy-dispersive Sensor families): it measures electrons out, not photons. Distinct too from the photon EnergyAnalyzer (the IXS diced-crystal energy analyzer): that disperses photons, this disperses electrons. Earned in once two deployments shared it, the soft / tender X-ray photoemission beamlines ESM (NSLS-II 21-ID, the ARPES Scienta SES) and SST (NSLS-II 7-ID, the HAXPES Scienta SES); analyzer model, lens-mode set, and pass-energy range are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Manipulator precedent). The photoemission electron microscope (LEEM / PEEM) is a distinct imaging instrument, deferred (PEEM-1)."
   - name: EmissionSpectrometer
+    affordances: [Imageable, Triggerable, Streamable]
+    presents_as: [Detector]
     note: "Crystal-analyzer X-ray emission spectrometer Family: a post-sample instrument that composes one or more bent analyzer crystals and an area / position-sensitive detector along a Rowland-circle (Johann) or wavelength-dispersive (von Hamos) geometry to measure the emitted X-ray spectrum (XES) or select an emission line for high-energy-resolution fluorescence detection (HERFD). Presents the Detector Role (it acquires the emission spectrum). Distinct from EnergyDispersiveSpectrometer (a point Sensor that resolves energy electronically per event, with no analyzer crystal) and from Monochromator (a beam-conditioning Bragg optic upstream of the sample); the discriminator is the post-sample crystal-analyzer emission-dispersing role. Distinct too from the loose EnergyAnalyzer (the IXS diced-crystal analyzer selecting a fixed final energy on the inelastic-scattering arm, ANALYZER-1), which stays loose pending its own rule-of-three, and from the graduated SpectrometerArm Family (the extended dispersive grating / crystal-array positioning arm presenting the Positioner Role): an EmissionSpectrometer is the compact crystal-analyzer Detector, a SpectrometerArm is the extended dispersive positioner. Earned in once two deployments shared it, SLAC LCLS-MFX (the von Hamos six-crystal XES spectrometer) and NSLS-II ISS (8-ID, the Johann plus von Hamos crystal emission spectrometers for XES / HERFD); crystal cut, Rowland radius, and Johann-vs-von-Hamos geometry are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Manipulator precedent). MAX IV Balder is a third near-sighting (SCANIA-2D). Whether each analyzer crystal is a child Asset is deferred (SPEC-1)."
   - name: SpectrometerArm
+    affordances: [Homeable, Limitable, Translatable, Rotatable]
+    presents_as: [Positioner]
     note: "Dispersive spectrometer-arm Family: a long post-sample arm that positions a diffraction grating (or an array of analyzer crystals) and carries a position-sensitive detector at its focus, energy-dispersing the scattered or emitted beam along a Rowland or backscattering geometry. Presents the Positioner Role: the arm sets the grating and detector geometry (real detx / detz / grtx axes decomposed to virtual arm radii), which is why it never fit the point-Sensor families (FluxMonitor / EnergyDispersiveSpectrometer). Distinct from EmissionSpectrometer (a compact crystal-analyzer emission spectrometer presenting the Detector Role) and from the loose EnergyAnalyzer (the IXS diced-crystal analyzer selecting a fixed final energy): the discriminator is the extended dispersive positioning arm. Graduated on the rule-of-three across NSLS-II SIX (2-ID, the soft X-ray multi-chamber grating RIXS arm), ESRF ID32 (the RIXS arm and the XES arm, the same SpectrometerArmsController class instantiated twice), and ESRF ID28 (the hard X-ray multi-analyzer two-theta arm); grating-vs-crystal-array, chamber count, and Rowland radius are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Manipulator precedent). Whether each analyzer crystal or chamber is a child Asset is deferred (IXS-1)."
   - name: TemperatureController
+    affordances: [Settable, PIDControllable, Coolable, Reportable]
+    presents_as: [Regulator]
     note: "Continuous-setpoint sample-environment temperature actuator Family: drives a sample temperature to a commanded setpoint, typically via a PID control loop. Presents the Regulator Role (requires the Settable affordance). Distinct from Controller (which supervises subordinate Assets without itself performing) and Sensor (which only reports): a TemperatureController performs by acting on the temperature. Graduated on the rule-of-three across Diamond i22 (Linkam), i03 (cryostream, thawer), and i11 (Cyberstar / Eurotherm blowers, Oxford cryostreams); cooling-vs-heating and PID-vs-other are a per-Asset settings or bound-Model difference, not a Family split. FlowController (the settable-setpoint mass-flow / pump actuator sibling that also presents Regulator) graduated alongside it."
   - name: FlowController
+    affordances: [Settable, PIDControllable, Reportable]
+    presents_as: [Regulator]
     note: "Continuous-setpoint flow / pump actuator Family: drives a fluid flow rate or a pump delivery (rate / volume) to a commanded setpoint. Presents the Regulator Role (requires the Settable affordance), the settable-actuator sibling of TemperatureController, distinct by what it actuates (mass flow / pump rate, not temperature); and distinct from Controller (which supervises subordinate Assets without performing) and Sensor (which only reports). One Family spans mass-flow controllers and syringe / peristaltic / HPLC pumps; mass-flow-vs-pump and the pump type are a per-Asset settings or bound-Model difference, not a Family split (the TemperatureController precedent). Graduated on the rule-of-three across Diamond i22 (the sample-environment pump), APS 7-BM (the Sierra Smart-Trak mass-flow controllers), NSLS-II LIX (the HPLC sample-delivery pump), and NSLS-II XFP (the footprinting sample-delivery pumps). The wider fluidic chain beyond the pump (selector valves, SEC columns, flow cells, fraction collectors) stays in the ControlPort seam pending its own rule-of-three (FLUID-1)."
   - name: Magnet
+    affordances: [Settable, Reportable]
+    presents_as: [Regulator]
     note: "Sample-environment magnet Family: drives a magnetic field at the sample to a commanded setpoint (a single-axis high-field magnet or a multi-axis vector magnet). Presents the Regulator Role (requires the Settable affordance): the field is a settable process variable with a setpoint and a ramp, the TemperatureController / FlowController sibling, distinct by what it actuates (magnetic field, not temperature or flow); and distinct from Controller (which supervises subordinate Assets without performing) and Sensor (which only reports). One Family spans the split-coil superconducting magnets, the resistive electromagnets, and the multi-axis vector magnets; single-vs-vector-axis, field range, and ramp rate are a per-Asset settings or bound-Model difference, not a Family split (the TemperatureController precedent). Graduated on the rule-of-three across APS 4-ID POLAR (the 2 T / high-field magnetic-scattering magnets), Diamond i10-1 (the RASOR electromagnet and superconducting magnet), and ESRF ID32 (the 9 T / 4 T split-coil XMCD magnet); reinforced by SwissFEL Cristallina (the 3-axis vector magnet), PETRA III P09 (14 T) and P07 (17 T). The high-field-magnet personnel hazard is modelled through a Clearance, not baked into the Family."
   - name: PolarizationAnalyzer
+    affordances: [Homeable, Limitable, Rotatable]
+    presents_as: [Positioner]
     note: "Post-sample polarization-analysis Family: a scattered-beam analyzer block that measures (or selects) the polarization state of the beam after the sample, typically an analyzer crystal on a motorized arm (two-theta / theta, and the crystal orientation circles) set to a Bragg reflection whose scattering plane resolves the linear or circular polarization components. Presents the Positioner Role (the motorized analyzer circles that set the analysis geometry). Distinct from PhaseRetarder (the upstream optic that sets the incident polarization state, not measures the scattered state) and from Monochromator (which selects energy); the discriminator is post-sample polarization analysis. Graduated on the rule-of-three across APS 4-ID POLAR (the scattered-beam polarimeter), Diamond i10 (the POLAN polarization-analysis arm), ESRF ID32 (the RIXS-arm polarimeter), and PETRA III P09 (the scattered-beam and MAG polarization analyzers); analyzer crystal, arm geometry, and linear-vs-circular analysis are a per-Asset settings or bound-Model difference, not a Family split (the InsertionDevice / Transfocator precedent). Distinct too from the loose EnergyAnalyzer (the IXS diced-crystal analyzer selecting a fixed final energy); whether the two eventually merge into one Analyzer Family is the open ANALYZER-1 question, deferred (EnergyAnalyzer stays at n=1)."
   - name: PressureCell
+    affordances: [Settable, Reportable]
+    presents_as: [Regulator]
     note: "High-pressure sample-environment Family: a cell that holds the sample under a commanded pressure, typically a diamond anvil cell whose membrane gas pressure is driven to a setpoint (and read back) via a pressure controller, or a large-volume press. Presents the Regulator Role (requires the Settable affordance) for its membrane / load pressure, the sample-environment sibling of TemperatureController and FlowController, distinct by what it actuates (containment pressure, not temperature or flow). In-situ pressure / temperature metrology (ruby / Raman / Brillouin, spectroradiometry) and optional laser heating are per-Asset capabilities of the same cell, not a Family split. Graduated on the rule-of-three across APS 13-ID (the GSECARS diamond anvil cell on a PACE5000 membrane controller) and PETRA III P02 (the P02.2 diamond-anvil-cell environment); cell type (diamond anvil versus large-volume press), membrane-versus-load actuation, and the heating / metrology capabilities are a per-Asset settings or bound-Model difference, not a Family split (the TemperatureController precedent)."
   - name: Backlight
     note: "Sample-illumination Family: a visible-light source (a back light, ring light, or on-axis illuminator) that lights the sample for optical viewing, typically loop centering and on-axis alignment on an MX or imaging beamline. It is an illuminator, not a measuring device: it presents no Sensor / Detector Role (it produces light for a camera to see by, it does not itself acquire). Any on / off / brightness control or in / out insert axis is a per-Asset facet (a device with a motorized insert may present the Positioner Role for that axis), not the reason the Family exists. Distinct from Camera (which acquires the image the Backlight makes visible) and from any beam-diagnostic Family (it illuminates with visible light, it does not measure the X-ray beam). One Family spans back / front / ring / dual-head illuminators; single-vs-dual head, brightness control, and any insert axis are a per-Asset settings or bound-Model difference, not a Family split. Graduated on the rule-of-three across the MX and imaging fleet that shares on-axis sample illumination (Diamond i03 / i24 / i19, NSLS-II FMX, Australian Synchrotron MX3, SIRIUS MANACA, PETRA III P13 / P14, and the APS 13-ID microscope), the first illumination affordance no prior Family carried (DET-1)."
   - name: Laser
     note: "Optical laser Family: a visible / near-visible laser used at the sample, either a pump-probe excitation source fired in sync with the X-ray pulses (femtosecond / picosecond pump lasers on the time-resolved beamlines) or an alignment / reference laser marking the beam path and sample position. Modelled by Role, not mechanism: an optical laser presents no existing measurement Role (it is neither a Sensor / Detector nor, in itself, a Positioner; its motorized delay stage, waveplate, or shutter are per-Asset facets that may present Positioner for those axes). One Family spans the pump-probe and alignment / reference variants; pump-probe-vs-alignment is a per-Asset purpose (captured in the Asset name), not a Family split (the Table / Camera precedent). Graduated on the rule-of-three across APS 4-ID (the Ventus pump-probe laser), PSI Alvra and Bernina (each a pump-probe plus a reference laser), PSI Cristallina (the alignment laser), and SLAC LCLS-MFX (the fs pump-probe laser). Deliberately EXCLUDES lasers that are a capability of another device read by their actuation Role, not their mechanism: a sample-heating laser is a power-delivery / thermal-actuation capability of its host (the 13-ID PressureCell double-sided heating), NOT a member of this Family, so Laser never becomes a by-mechanism catch-all. Whether a given pump-probe laser is modelled as a device or carried only as a Clearance hazard (SAMPLE-1), and the class-4 laser-emission Enclosure permit / interlock (LASER-1), stay deferred open questions, orthogonal to this Family."
   - name: Screen
+    affordances: [Homeable, Limitable, Translatable]
+    presents_as: [Positioner]
     note: "Beam-viewing diagnostic screen Family: a phosphor / fluorescent screen (or YAG) on a motorized insert that is driven into the beam to make the X-ray beam visible to a camera for alignment and beam-profile viewing, and parked out of the beam for data collection. Presents the Positioner Role for its insert axis (the in / out or energy-tracked height move is the operable degree of freedom); the phosphor / screen material is a per-Asset setting. Distinct from Camera (the Screen makes the beam visible, the Camera acquires the image of it) and from the beam-diagnostic Sensor families (a Screen produces no scalar Reading, it is a viewing target). One Family spans single flags and multi-screen insert banks; screen material, count, and whether the insert height is energy-tracked are a per-Asset settings or bound-Model difference, not a Family split. Graduated on the rule-of-three across APS 2-BM (the energy-tracked diagnostic flag), NSLS-II BMM (the dm2 / dm3 fluorescent screens), and PETRA III P04 (the EXP2 motorized phosphor screen bank) (FLAG-1)."
   # Pending in code (documented, not yet defined): none.
   # future: OpticalRelay.
@@ -203,35 +274,43 @@ methods:
   - name: motor_homing
     capability: cora.capability.maintenance
     purpose: "Reference-position seek for motorized Devices; leaves encoders zeroed for absolute moves."
-    needed_families: [RotaryStage, LinearStage]
+    required_roles: [Positioner]
+    note: "Binds by Role: homes any Positioner generically (not a specific stage family). Contrast hexapod_reboot, whose recovery is device-specific and stays family-bound."
   - name: resolution_alignment
     capability: cora.capability.alignment
     purpose: "The resolution step, an iterative propagation-distance peak search on a mounted resolution target."
-    needed_families: [LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: focus_alignment
     capability: cora.capability.alignment
     purpose: "The focus step, an iterative Sample-Z peak search for depth-of-focus."
-    needed_families: [LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: center_alignment
     capability: cora.capability.alignment
     purpose: "The center step, iterative 0/180 convergence on the rotation-axis pixel position."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: roll_alignment
     capability: cora.capability.alignment
     purpose: "The roll step, iterative 0/180 Y-delta correction so the rotation axis is perpendicular to the camera Y axis."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: pitch_alignment
     capability: cora.capability.alignment
     purpose: "The pitch step, iterative 0/180 sharpness-delta correction so the rotation axis is perpendicular to the beam."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: dark_field
     capability: cora.capability.acquisition
     purpose: "Dark-frame stack plus pixel-wise baseline, producing a Dataset for reconstruction subtraction."
-    needed_families: [Shutter, Camera, Scintillator]
+    required_roles: [Shutter, Detector]
+    note: "Binds by Role: a Shutter (closed for the dark frames) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a constituent of that detector Assembly, not a separate Method requirement)."
   - name: flat_field
     capability: cora.capability.acquisition
     purpose: "Flat-field stack (shutter open, no sample) plus pixel-wise baseline, producing a Dataset for reconstruction division."
-    needed_families: [Shutter, Camera, Scintillator]
+    required_roles: [Shutter, Detector]
+    note: "Binds by Role: a Shutter (open, no sample) and a Detector (as in dark_field; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: hexapod_reboot
     capability: cora.capability.maintenance
     purpose: "Recovery for a stuck hexapod controller: IOC stop, PDU power-cycle, IOC start, enable check."
@@ -239,11 +318,13 @@ methods:
   - name: tomography
     capability: cora.capability.tomography
     purpose: "The canonical imaging routine; a Run producing an H5 projection-stack Dataset from operator exposure, projections, and angle-range."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role (federation-portable), not by anatomical family. Two Positioner slots at runtime: the tomographic rotation axis and the sample x/y/z stack (RotaryStage + LinearStage both present Positioner). One Detector slot: a direct-detection Camera OR a composed scintillator-relay Assembly (the Scintillator is a constituent of that detector Assembly, not a separate Method requirement, so it drops out of the binding contract). See the recipe integration test for the exact RoleRequirement slots."
   - name: sensitivity_characterization
     capability: cora.capability.characterization
     purpose: "Pre-step measuring motor-sensitivity constants empirically (bump an axis by a known delta, observe centroid shift, K = shift/bump)."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: energy_characterization
     capability: cora.capability.characterization
     purpose: "Energy calibration via a channel-cut crystal: rock a crystal of known 2d through its Bragg peak, fit the peak angle, recover the true beam energy, and re-save the corrected per-energy curve as a new revision (ENERGY-7)."
@@ -251,19 +332,23 @@ methods:
   - name: streaming_tomography
     capability: cora.capability.tomography
     purpose: "Live-reconstruction tomography supporting mid-flight adjust_run steering on observed reco quality."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: continuous_rotation_tomography
     capability: cora.capability.tomography
     purpose: "N back-to-back rotation Runs sharing one Plan and Subject under a Campaign(intent=Series)."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: mosaic_tomography
     capability: cora.capability.tomography
     purpose: "Tiled lateral-translation tomography for samples larger than the field of view, stitched in post."
-    needed_families: [RotaryStage, LinearStage, Camera, Scintillator]
+    required_roles: [Positioner, Detector]
+    note: "Binds by Role: a Positioner (rotation and/or sample axes) and a Detector (a direct Camera or a composed scintillator-relay Assembly; the Scintillator is a detector-Assembly constituent, not a Method requirement)."
   - name: xpcs
     capability: cora.capability.xpcs
     purpose: "Coherent-scattering time-series acquisition: a high-rate frame stream on a coherent area detector, gated by the softGlue timing, correlated downstream into g2. The frame stream is DAQ-owned, distinct from a poll-to-Done capture (the event-stream acquisition axis)."
-    needed_families: [Camera, Shutter, TimingController]
+    required_roles: [Detector, Shutter, Controller]
+    note: "X-ray Photon Correlation Spectroscopy (XPCS is the canonical technique name, kept abbreviated). Fully Role-bound: a Detector (the coherent area Camera), a Shutter (beam gating), and a Controller (the timing box generating the frame-gate pulses)."
   # Modality technique methods (operations-layer re-derivation). needed_families
   # is the MINIMAL defining hardware for the acquisition act (the discriminating
   # detector / analyzer plus the essential motion or optic), kept tight so the

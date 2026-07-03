@@ -79,25 +79,48 @@ class DerivedRoster:
     missing_families: dict[str, frozenset[str]]
 
 
+def _roles_presented_by(
+    families: frozenset[str],
+    catalog: catalog_descriptor.Catalog,
+) -> frozenset[str]:
+    """The set of Role names some family in `families` presents (catalog
+    `presents_as`). Lets a Method's `required_roles` be covered anatomically:
+    a beamline covers a Role when it has a family that presents it."""
+    presented: set[str] = set()
+    for fam in catalog.families:
+        if fam.name in families:
+            presented.update(fam.presents_as)
+    return frozenset(presented)
+
+
 def derive_roster(
     descriptor: beamline_descriptor.BeamlineDescriptor,
     catalog: catalog_descriptor.Catalog,
 ) -> DerivedRoster:
     """Compute the practiceable-Method roster for one beamline.
 
-    A Method with an EMPTY `needed_families` is excluded: it declares no
-    hardware contract, so "coverage" is vacuous and it would appear on every
-    beamline's roster as noise. Such Methods (if any) are site-ceremony, not
-    hardware-gated Practices, and are out of this derivation's scope.
+    A Method is practiceable when the beamline covers BOTH its hardware
+    contracts: every `needed_families` entry is a beamline family (the
+    anatomical escape hatch), AND every `required_roles` entry is presented by
+    some beamline family (the federation-portable role binding, via catalog
+    `presents_as`). Coverage of the two fields is ANDed.
+
+    A Method declaring NEITHER field is excluded: it has no hardware contract,
+    so coverage is vacuous and it would appear on every roster as noise. Such
+    Methods are site-ceremony, not hardware-gated Practices, out of scope here.
     """
     families = beamline_families(descriptor)
+    presented_roles = _roles_presented_by(families, catalog)
     practiceable: set[str] = set()
     missing: dict[str, frozenset[str]] = {}
     for method in catalog.methods:
         needed = frozenset(method.needed_families)
-        if not needed:
+        required_roles = frozenset(method.required_roles)
+        if not needed and not required_roles:
             continue
-        gap = needed - families
+        gap = (needed - families) | frozenset(
+            f"role:{r}" for r in (required_roles - presented_roles)
+        )
         if gap:
             missing[method.name] = gap
         else:
