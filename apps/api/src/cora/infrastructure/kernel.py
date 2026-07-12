@@ -45,6 +45,7 @@ from cora.infrastructure.config import Settings
 from cora.infrastructure.ports import (
     LLM,
     AllBeamOpenLookup,
+    AlwaysGrantedSpendGuard,
     AssemblyLookup,
     AssetLookup,
     Authorize,
@@ -71,6 +72,7 @@ from cora.infrastructure.ports import (
     RoleLookup,
     RunActorInvolvementLookup,
     Signer,
+    SpendGuard,
     SpendLookup,
     SupplyLookup,
     TokenVerifier,
@@ -155,6 +157,9 @@ class Kernel:
     `NoSuppliesRegisteredLookup` for the missing-kind path. Mirrors
     the `ClearanceLookup` / `CautionLookup` test-default pattern.
     See [[project_supply_preflight_gate_design]].
+
+    `spend_guard`: the pre-call half of budget enforcement, consulted by
+    the steering brain before each LLM call; see the field docstring.
 
     `spend_lookup`: cross-BC port consumed by the budget gate at the
     LLM subscribers' seams (RunDebriefer / CautionDrafter) to sum an
@@ -389,6 +394,13 @@ class Kernel:
     `ControlPortBeamAvailabilityLookup` over the shared ControlPort when
     `BEAM_AVAILABILITY_PVS` is configured. Gate-specific tests likewise
     `replace` it with a stub returning the reading under test."""
+    spend_guard: SpendGuard = field(default_factory=AlwaysGrantedSpendGuard)
+    """Pre-call budget permission for an agent's next LLM call (the
+    per-call pre-estimate enforcement tier). Defaults to the always-pass
+    stub so tests and non-steering deployments are unaffected; the
+    composition root binds the Agent BC's `BudgetSpendGuard` in
+    production, which reads the caller's declared caps and the recorded
+    spend the `spend_lookup` sums."""
 
     inference_recorder: InferenceRecorder = field(default_factory=NullInferenceRecorder)
     """Cross-BC capability port the LLM-backed agents call to record one
