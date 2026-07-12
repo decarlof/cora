@@ -109,6 +109,11 @@ from cora.infrastructure.ports.inference_recorder import (
     InferenceRecorder,
     NullInferenceRecorder,
 )
+from cora.infrastructure.ports.language_model_lookup import (
+    AlwaysApprovedLanguageModelLookup,
+    LanguageModelLookup,
+    LanguageModelLookupResult,
+)
 from cora.infrastructure.ports.llm import (
     LLM,
     CacheBreakpoint,
@@ -131,6 +136,11 @@ from cora.infrastructure.ports.llm import (
     ModelRef,
 )
 from cora.infrastructure.ports.logbook_mirror import LogbookMirror
+from cora.infrastructure.ports.model_usage_lookup import (
+    AlwaysEmptyModelUsageLookup,
+    ModelUsageLookup,
+    ModelUsageLookupResult,
+)
 from cora.infrastructure.ports.profile_store import Profile, ProfileStore
 from cora.infrastructure.ports.role_lookup import (
     RoleLookup,
@@ -176,8 +186,10 @@ __all__ = [
     "AllSatisfiedSupplyLookup",
     "Allow",
     "AllowAllAuthorize",
+    "AlwaysApprovedLanguageModelLookup",
     "AlwaysCoveredClearanceLookup",
     "AlwaysEmptyCapabilityLookup",
+    "AlwaysEmptyModelUsageLookup",
     "AlwaysGrantedSpendGuard",
     "AlwaysPermittedEnclosureLookup",
     "AlwaysQuietCautionLookup",
@@ -248,10 +260,14 @@ __all__ = [
     "LLMSystemPrompt",
     "LLMTimeoutError",
     "LLMUsage",
+    "LanguageModelLookup",
+    "LanguageModelLookupResult",
     "LockedRecent",
     "LogbookMirror",
     "MinSeverity",
     "ModelRef",
+    "ModelUsageLookup",
+    "ModelUsageLookupResult",
     "NeverRatifiedConsequenceLookup",
     "NewEvent",
     "NoComputeReachabilityLookup",

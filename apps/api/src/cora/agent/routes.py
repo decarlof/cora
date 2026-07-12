@@ -57,6 +57,19 @@ from cora.agent.aggregates.agent import (
     InvalidModelRefError,
     InvalidToolNameError,
 )
+from cora.agent.aggregates.language_model import (
+    InvalidCostBasisError,
+    InvalidEndpointNoteError,
+    InvalidLanguageModelNameError,
+    InvalidLanguageModelReasonError,
+    LanguageModelAlreadyExistsError,
+    LanguageModelCannotAnnounceRetirementError,
+    LanguageModelCannotApproveError,
+    LanguageModelCannotDeprecateError,
+    LanguageModelCannotRetireError,
+    LanguageModelNotApprovedError,
+    LanguageModelNotFoundError,
+)
 from cora.agent.errors import (
     CautionProposalMalformedError,
     CautionProposalNotActionableError,
@@ -70,14 +83,20 @@ from cora.agent.errors import (
     UnauthorizedError,
 )
 from cora.agent.features import (
+    announce_language_model_retirement,
+    approve_language_model,
     define_agent,
+    define_language_model,
     deprecate_agent,
+    deprecate_language_model,
     dismiss_event_in_reaction,
     get_agent,
     grant_tool_to_agent,
+    list_at_risk_results,
     promote_caution_proposal,
     regenerate_run_debrief,
     resume_agent,
+    retire_language_model,
     revoke_tool_from_agent,
     set_agent_target_plan,
     suspend_agent,
@@ -168,6 +187,12 @@ def register_agent_routes(app: FastAPI) -> None:
     app.include_router(regenerate_run_debrief.router)
     app.include_router(promote_caution_proposal.router)
     app.include_router(dismiss_event_in_reaction.router)
+    app.include_router(define_language_model.router)
+    app.include_router(approve_language_model.router)
+    app.include_router(announce_language_model_retirement.router)
+    app.include_router(retire_language_model.router)
+    app.include_router(deprecate_language_model.router)
+    app.include_router(list_at_risk_results.router)
     # 400 validation handlers: Invalid<X> family + cross-aggregate guards.
     #
     # NOT registered here: DecisionParentAgentMismatchError +
@@ -200,15 +225,23 @@ def register_agent_routes(app: FastAPI) -> None:
         CautionProposalMalformedError,
         # dismiss_event_in_reaction validation error.
         InvalidDismissalReasonError,
+        # LanguageModel catalog validation errors.
+        InvalidLanguageModelNameError,
+        InvalidEndpointNoteError,
+        InvalidLanguageModelReasonError,
+        InvalidCostBasisError,
+        # define_agent catalog gate (arms only when a real catalog is wired).
+        LanguageModelNotApprovedError,
     ):
         app.add_exception_handler(validation_cls, _handle_validation_error)
     for not_found_cls in (
         AgentNotFoundError,
+        LanguageModelNotFoundError,
         SubscriberBookmarkNotFoundError,
         DismissalEventNotFoundError,
     ):
         app.add_exception_handler(not_found_cls, _handle_not_found)
-    for already_exists_cls in (AgentAlreadyExistsError,):
+    for already_exists_cls in (AgentAlreadyExistsError, LanguageModelAlreadyExistsError):
         app.add_exception_handler(already_exists_cls, _handle_already_exists)
     for cannot_transition_cls in (
         AgentCannotVersionError,
@@ -220,6 +253,10 @@ def register_agent_routes(app: FastAPI) -> None:
         AgentCannotUpdateBudgetError,
         AgentCannotSetTargetPlanError,
         EventAlreadyDismissedError,
+        LanguageModelCannotApproveError,
+        LanguageModelCannotAnnounceRetirementError,
+        LanguageModelCannotRetireError,
+        LanguageModelCannotDeprecateError,
     ):
         app.add_exception_handler(cannot_transition_cls, _handle_cannot_transition)
     app.add_exception_handler(UnauthorizedError, _handle_unauthorized)

@@ -62,6 +62,7 @@ from cora.agent import (
     seed_clearance_expirer_agent,
     seed_clearance_watcher_agent,
     seed_experiment_steerer_agent,
+    seed_language_models,
     seed_procedure_watcher_agent,
     seed_ratification_enforcer_agent,
     seed_run_debriefer_agent,
@@ -69,7 +70,7 @@ from cora.agent import (
     seed_run_supervisor_agent,
     wire_agent,
 )
-from cora.agent.adapters import BudgetSpendGuard
+from cora.agent.adapters import BudgetSpendGuard, PostgresLanguageModelLookup
 from cora.api._calibration_watcher import calibration_watcher_lifespan
 from cora.api._campaign_watcher import campaign_watcher_lifespan
 from cora.api._clearance_expirer import clearance_expirer_lifespan
@@ -125,7 +126,7 @@ from cora.decision import (
     register_decision_tools,
     wire_decision,
 )
-from cora.decision.adapters import PostgresSpendLookup
+from cora.decision.adapters import PostgresModelUsageLookup, PostgresSpendLookup
 from cora.enclosure import (
     EnclosureHandlers,
     enclosure_permit_monitor_lifespan,
@@ -623,6 +624,13 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                 capability_lookup_factory=PostgresCapabilityLookup,
                 supply_lookup_factory=PostgresSupplyLookup,
                 spend_lookup_factory=PostgresSpendLookup,
+                # LanguageModel catalog lookup for the define_agent gate
+                # and the at-risk-results usage lookup, both through the
+                # factory grammar. Test mode (app_env=test) skips the
+                # factories and keeps the always-approved / always-empty
+                # stubs, matching the ports' opt-in posture.
+                language_model_lookup_factory=PostgresLanguageModelLookup,
+                model_usage_lookup_factory=PostgresModelUsageLookup,
                 run_actor_involvement_lookup_factory=PostgresRunActorInvolvementLookup,
                 consequence_lookup_factory=PostgresConsequenceLookup,
                 dataset_distribution_lookup_factory=PostgresDatasetDistributionLookup,
@@ -839,6 +847,19 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             await seed_run_debriefer_agent(deps)
             # same shape for CautionDrafter.
             await seed_caution_drafter_agent(deps)
+            # LanguageModel catalog entries for the fleet's three default
+            # models, born Defined AND Approved so the define_agent gate
+            # never refuses the shipped fleet on a fresh deployment.
+            await seed_language_models(deps)
+            # Drain Agent-owned projections synchronously (the federation /
+            # enclosure drain shape below): first boot must not refuse
+            # define_agent for the models the seed just approved while the
+            # worker catches up, and PostgresLanguageModelLookup reads
+            # proj_agent_language_model_summary. Cheap no-op in-memory.
+            agent_only_registry = ProjectionRegistry()
+            register_agent_projections(agent_only_registry, deps)
+            if deps.pool is not None:
+                await drain_projections(deps.pool, agent_only_registry, deadline_seconds=5.0)
             # same shape for RunSupervisor (deterministic in-loop agent).
             await seed_run_supervisor_agent(deps)
             # same shape for RunInitiator (deterministic agent that starts Runs;
