@@ -63,7 +63,13 @@ from cora.run.aggregates.run.events import (
     RunCompleted,
 )
 from tests.unit._helpers import build_deps
-from tests.unit.agent._helpers import Ed25519FakeSigner, FakeInferenceRecorder
+from tests.unit.agent._helpers import (
+    Ed25519FakeSigner,
+    FakeInferenceRecorder,
+    FakeSpendLookup,
+    seed_suspended_agent,
+    seed_versioned_agent,
+)
 
 _NOW = datetime(2026, 5, 17, 14, 0, 0, tzinfo=UTC)
 _LATER = datetime(2026, 5, 17, 14, 47, 0, tzinfo=UTC)
@@ -238,12 +244,14 @@ async def _build_subscriber(
     event_store: InMemoryEventStore,
     llm: FakeLLM,
     inference_recorder: FakeInferenceRecorder | None = None,
+    spend_lookup: FakeSpendLookup | None = None,
 ) -> CautionDrafterSubscriber:
     return CautionDrafterSubscriber(
         event_store=event_store,
         llm=llm,
         caution_lookup=AlwaysQuietCautionLookup(),
         inference_recorder=inference_recorder,
+        spend_lookup=spend_lookup,
     )
 
 
@@ -430,6 +438,112 @@ async def test_apply_writes_no_action_deferred_on_llm_failure() -> None:
     assert "LLM call failed with LLMServerError" in (decision.reasoning or "")
     assert decision.inputs is not None
     assert decision.inputs["failure_error_class"] == "LLMServerError"
+
+
+# ---------- Suspension gate + budget gate (mirror RunDebriefer) ----------
+
+
+@pytest.mark.unit
+async def test_apply_skips_entirely_when_agent_suspended() -> None:
+    """A Suspended agent takes no actions: no LLM call, no Decision."""
+    store = InMemoryEventStore()
+    llm = FakeLLM(responses=[_CANNED_NO_ACTION])
+    await _seed_caution_drafter_actor(store)
+    await seed_suspended_agent(
+        store,
+        agent_id=CAUTION_DRAFTER_AGENT_ID,
+        genesis_event_id=uuid4(),
+        version_event_id=uuid4(),
+        suspend_event_id=uuid4(),
+        correlation_id=_CORRELATION_ID,
+        principal_id=_PRINCIPAL_ID,
+        defined_at=_NOW,
+        versioned_at=_NOW,
+        suspended_at=_NOW,
+        reason="cost overrun",
+    )
+    await _seed_plan(store)
+    run_id = uuid4()
+    await _seed_run(store, run_id)
+    subscriber = await _build_subscriber(store, llm)
+    event = _terminal_event(event_type="RunCompleted", run_id=run_id)
+
+    await subscriber.apply(event, conn=None)
+
+    assert await load_decision(store, _derive_decision_id(event.event_id)) is None
+    assert llm.received == []
+
+
+@pytest.mark.unit
+async def test_apply_defers_noaction_when_monthly_usd_cap_exhausted() -> None:
+    """Cap reached: the LLM call is skipped and the refusal is recorded
+    as this Run's NoAction Decision (coarse post-hoc tier)."""
+    store = InMemoryEventStore()
+    llm = FakeLLM(responses=[_CANNED_NO_ACTION])
+    recorder = FakeInferenceRecorder()
+    await _seed_caution_drafter_actor(store)
+    await seed_versioned_agent(
+        store,
+        agent_id=CAUTION_DRAFTER_AGENT_ID,
+        genesis_event_id=uuid4(),
+        version_event_id=uuid4(),
+        correlation_id=_CORRELATION_ID,
+        principal_id=_PRINCIPAL_ID,
+        defined_at=_NOW,
+        versioned_at=_NOW,
+        monthly_usd_cap=120.0,
+    )
+    await _seed_plan(store)
+    run_id = uuid4()
+    await _seed_run(store, run_id)
+    subscriber = await _build_subscriber(
+        store, llm, recorder, spend_lookup=FakeSpendLookup(usd_spent=121.3)
+    )
+    event = _terminal_event(event_type="RunCompleted", run_id=run_id)
+
+    await subscriber.apply(event, conn=None)
+
+    decision = await load_decision(store, _derive_decision_id(event.event_id))
+    assert decision is not None
+    assert decision.choice.value == "NoAction"
+    assert "Agent budget exhausted: monthly_usd_cap" in (decision.reasoning or "")
+    assert decision.inputs is not None
+    assert decision.inputs["failure_error_class"] == "AgentBudgetExhausted"
+    assert decision.inputs["budget_cap_kind"] == "monthly_usd_cap"
+    assert recorder.calls == []
+    assert llm.received == []
+
+
+@pytest.mark.unit
+async def test_apply_proceeds_normally_when_spend_is_under_cap() -> None:
+    """A declared budget with headroom never interferes with the
+    draft: the gate is invisible until a cap is exhausted."""
+    store = InMemoryEventStore()
+    llm = FakeLLM(responses=[_CANNED_NO_ACTION])
+    await _seed_caution_drafter_actor(store)
+    await seed_versioned_agent(
+        store,
+        agent_id=CAUTION_DRAFTER_AGENT_ID,
+        genesis_event_id=uuid4(),
+        version_event_id=uuid4(),
+        correlation_id=_CORRELATION_ID,
+        principal_id=_PRINCIPAL_ID,
+        defined_at=_NOW,
+        versioned_at=_NOW,
+        monthly_usd_cap=500.0,
+    )
+    await _seed_plan(store)
+    run_id = uuid4()
+    await _seed_run(store, run_id)
+    subscriber = await _build_subscriber(store, llm, spend_lookup=FakeSpendLookup(usd_spent=1.0))
+    event = _terminal_event(event_type="RunCompleted", run_id=run_id)
+
+    await subscriber.apply(event, conn=None)
+
+    decision = await load_decision(store, _derive_decision_id(event.event_id))
+    assert decision is not None
+    assert len(llm.received) == 1
+    assert "failure_error_class" not in (decision.inputs or {})
 
 
 class _RaisingLLM:
@@ -879,6 +993,9 @@ def test_make_caution_drafter_subscriber_constructs_when_llm_is_set() -> None:
     deps = build_deps(llm=FakeLLM())
     subscriber = make_caution_drafter_subscriber(deps)
     assert isinstance(subscriber, CautionDrafterSubscriber)
+    # The budget gate silently disables if the factory drops this wiring
+    # (the constructor default is the permissive AlwaysZeroSpendLookup).
+    assert subscriber.spend_lookup is deps.spend_lookup
 
 
 # ---------- Signer wiring ----------
@@ -1222,6 +1339,8 @@ async def test_apply_records_inference_on_proposal() -> None:
     assert call.trace.response_model == "claude-sonnet-4-6-20260201"
     assert call.trace.input_tokens == 2048
     assert call.trace.output_tokens == 320
+    # Sonnet 4.6 at $3/$15 per MTok: 2048 in + 320 out.
+    assert call.trace.cost_usd == pytest.approx(0.006144 + 0.0048)
     assert call.trace.finish_reasons == ("tool_use",)
     assert call.trace.agent_id == str(CAUTION_DRAFTER_AGENT_ID)
     assert call.trace.agent_name == CAUTION_DRAFTER_AGENT_NAME
