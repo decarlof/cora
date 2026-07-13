@@ -81,6 +81,7 @@ from cora.infrastructure.kernel import Kernel, Teardown
 from cora.infrastructure.logging import configure_logging
 from cora.infrastructure.ports import (
     LLM,
+    AllocationLookup,
     AllSatisfiedSupplyLookup,
     AlwaysApprovedLanguageModelLookup,
     AlwaysCoveredClearanceLookup,
@@ -111,6 +112,7 @@ from cora.infrastructure.ports import (
     LanguageModelLookup,
     LogbookMirror,
     ModelUsageLookup,
+    NoActiveAllocationLookup,
     NoComputeReachabilityLookup,
     NoDatasetDistributionsLookup,
     NoInvolvementLookup,
@@ -188,6 +190,7 @@ def make_postgres_kernel(
     enclosure_lookup: EnclosureLookup | None = None,
     language_model_lookup: LanguageModelLookup | None = None,
     model_usage_lookup: ModelUsageLookup | None = None,
+    allocation_lookup: AllocationLookup | None = None,
     profile_store: ProfileStore | None = None,
     llm: LLM | None = None,
     logbook_mirror: LogbookMirror | None = None,
@@ -240,6 +243,14 @@ def make_postgres_kernel(
     injects the real `PostgresSupplyLookup` via the
     `supply_lookup_factory` argument; gate-specific tests override
     here explicitly. See [[project_supply_preflight_gate_design]].
+
+    `spend_lookup` and `allocation_lookup` default to the disarmed
+    stubs (`AlwaysZeroSpendLookup` / `NoActiveAllocationLookup`) here,
+    the same opt-in posture as every other lookup: an integration test
+    that does not exercise the envelope never meters or gates on it.
+    The fail-loud requirement lives one layer up, in `build_kernel`'s
+    Postgres branch, which raises when either financial factory is
+    missing so a real deployment can never silently meter zero.
 
     `run_actor_involvement_lookup` defaults to `NoInvolvementLookup`
     (returns `[]`) so existing tests don't have to seed runs.
@@ -402,6 +413,9 @@ def make_postgres_kernel(
         model_usage_lookup=(
             model_usage_lookup if model_usage_lookup is not None else AlwaysEmptyModelUsageLookup()
         ),
+        allocation_lookup=(
+            allocation_lookup if allocation_lookup is not None else NoActiveAllocationLookup()
+        ),
         profile_store=(profile_store if profile_store is not None else PostgresProfileStore(pool)),
         canonicalization_registry=_build_default_canonicalization_registry(),
         signing_registry=SigningRegistry(),
@@ -443,6 +457,7 @@ def make_inmemory_kernel(
     enclosure_lookup: EnclosureLookup | None = None,
     language_model_lookup: LanguageModelLookup | None = None,
     model_usage_lookup: ModelUsageLookup | None = None,
+    allocation_lookup: AllocationLookup | None = None,
     profile_store: ProfileStore | None = None,
     llm: LLM | None = None,
     logbook_mirror: LogbookMirror | None = None,
@@ -558,6 +573,13 @@ def make_inmemory_kernel(
     it. Slice-specific tests override with a fake returning seeded
     `ModelUsageLookupResult` rows.
 
+    `allocation_lookup` defaults to `NoActiveAllocationLookup` (no
+    envelope Active) for the same reason: no projection worker, no
+    `proj_budget_allocation_summary` table to read from, and the
+    envelope check must stay disarmed for every test that never
+    declared an allocation. Envelope-gate tests override with a fake
+    returning a chosen `AllocationLookupResult`.
+
     `llm` defaults to `None`; the in-memory kernel is for unit /
     contract tests that don't exercise LLM subscribers. Subscriber
     tests that DO exercise the LLM path inject `FakeLLM`
@@ -639,6 +661,9 @@ def make_inmemory_kernel(
         ),
         model_usage_lookup=(
             model_usage_lookup if model_usage_lookup is not None else AlwaysEmptyModelUsageLookup()
+        ),
+        allocation_lookup=(
+            allocation_lookup if allocation_lookup is not None else NoActiveAllocationLookup()
         ),
         profile_store=profile_store if profile_store is not None else InMemoryProfileStore(),
         canonicalization_registry=_build_default_canonicalization_registry(),
@@ -775,6 +800,25 @@ class LanguageModelLookupFactory(Protocol):
         self,
         pool: asyncpg.Pool,
     ) -> LanguageModelLookup: ...
+
+
+class AllocationLookupFactory(Protocol):
+    """Builds the production AllocationLookup port for the Kernel.
+
+    Budget BC's `cora.budget.adapters.PostgresAllocationLookup` is the
+    production factory; `cora.api.main` binds it. Same factory-
+    injection shape as the other lookup factories so
+    `cora.infrastructure.deps` doesn't import from any BC.
+
+    `pool` is `None` only when `app_env=test`; the production factory
+    requires a real pool. Test mode falls back to
+    `NoActiveAllocationLookup` automatically.
+    """
+
+    def __call__(
+        self,
+        pool: asyncpg.Pool,
+    ) -> AllocationLookup: ...
 
 
 class ModelUsageLookupFactory(Protocol):
@@ -1044,6 +1088,7 @@ async def build_kernel(
     spend_lookup_factory: SpendLookupFactory | None = None,
     language_model_lookup_factory: LanguageModelLookupFactory | None = None,
     model_usage_lookup_factory: ModelUsageLookupFactory | None = None,
+    allocation_lookup_factory: AllocationLookupFactory | None = None,
     run_actor_involvement_lookup_factory: RunActorInvolvementLookupFactory | None = None,
     consequence_lookup_factory: ConsequenceLookupFactory | None = None,
     dataset_distribution_lookup_factory: DatasetDistributionLookupFactory | None = None,
@@ -1120,6 +1165,18 @@ async def build_kernel(
         )
         return kernel, _noop_teardown
 
+    if spend_lookup_factory is None or allocation_lookup_factory is None:
+        # Fail loud, not open: a Postgres deployment that silently fell back
+        # to the zero-spend stub and the no-active-envelope stub would meter
+        # every call at $0 and disarm the instrument ceiling, and every seal
+        # would record $0 as the official closing figure. The financial
+        # lookups are the one place a missing binding must stop startup.
+        raise ValueError(
+            "build_kernel requires spend_lookup_factory and "
+            "allocation_lookup_factory in a Postgres deployment; a missing "
+            "financial lookup would silently meter zero and disarm the "
+            "spend envelope"
+        )
     pool = await create_pool(
         settings.database_url,
         min_size=settings.db_pool_min_size,
@@ -1154,9 +1211,8 @@ async def build_kernel(
         if supply_lookup_factory is not None
         else AllSatisfiedSupplyLookup()
     )
-    spend_lookup: SpendLookup = (
-        spend_lookup_factory(pool) if spend_lookup_factory is not None else AlwaysZeroSpendLookup()
-    )
+    # Non-None guaranteed by the fail-loud guard above.
+    spend_lookup: SpendLookup = spend_lookup_factory(pool)
     language_model_lookup: LanguageModelLookup = (
         language_model_lookup_factory(pool)
         if language_model_lookup_factory is not None
@@ -1167,6 +1223,8 @@ async def build_kernel(
         if model_usage_lookup_factory is not None
         else AlwaysEmptyModelUsageLookup()
     )
+    # Non-None guaranteed by the fail-loud guard above.
+    allocation_lookup: AllocationLookup = allocation_lookup_factory(pool)
     run_actor_involvement_lookup: RunActorInvolvementLookup = (
         run_actor_involvement_lookup_factory(pool)
         if run_actor_involvement_lookup_factory is not None
@@ -1233,6 +1291,7 @@ async def build_kernel(
         spend_lookup=spend_lookup,
         language_model_lookup=language_model_lookup,
         model_usage_lookup=model_usage_lookup,
+        allocation_lookup=allocation_lookup,
         run_actor_involvement_lookup=run_actor_involvement_lookup,
         consequence_lookup=consequence_lookup,
         dataset_distribution_lookup=dataset_distribution_lookup,

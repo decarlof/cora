@@ -5,6 +5,11 @@ wired into `Kernel` at startup. Domain and application code imports only
 from `ports/`, never from adapter modules.
 """
 
+from cora.infrastructure.ports.allocation_lookup import (
+    AllocationLookup,
+    AllocationLookupResult,
+    NoActiveAllocationLookup,
+)
 from cora.infrastructure.ports.assembly_lookup import (
     AssemblyLookup,
     AssemblyLookupResult,
@@ -164,6 +169,7 @@ from cora.infrastructure.ports.spend_lookup import (
     AlwaysZeroSpendLookup,
     SpendLookup,
     SpendLookupResult,
+    TotalSpendResult,
 )
 from cora.infrastructure.ports.supply_lookup import (
     AllSatisfiedSupplyLookup,
@@ -184,6 +190,8 @@ __all__ = [
     "AgentInferenceTrace",
     "AllBeamOpenLookup",
     "AllSatisfiedSupplyLookup",
+    "AllocationLookup",
+    "AllocationLookupResult",
     "Allow",
     "AllowAllAuthorize",
     "AlwaysApprovedLanguageModelLookup",
@@ -270,6 +278,7 @@ __all__ = [
     "ModelUsageLookupResult",
     "NeverRatifiedConsequenceLookup",
     "NewEvent",
+    "NoActiveAllocationLookup",
     "NoComputeReachabilityLookup",
     "NoDatasetDistributionsLookup",
     "NoInvolvementLookup",
@@ -296,6 +305,7 @@ __all__ = [
     "SupplyLookupResult",
     "SystemClock",
     "TokenVerifier",
+    "TotalSpendResult",
     "UUIDv7Generator",
     "VerifiedPrincipal",
 ]

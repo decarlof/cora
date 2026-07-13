@@ -86,6 +86,15 @@ from cora.api._run_initiator import run_initiator_lifespan
 from cora.api._run_supervisor import run_supervisor_lifespan
 from cora.api.middleware import BodySizeLimitMiddleware
 from cora.api.protected_resource_metadata import register_protected_resource_metadata_route
+from cora.budget import (
+    BudgetHandlers,
+    register_budget_projections,
+    register_budget_routes,
+    register_budget_subscribers,
+    register_budget_tools,
+    wire_budget,
+)
+from cora.budget.adapters import PostgresAllocationLookup
 from cora.calibration import (
     CalibrationHandlers,
     register_calibration_projections,
@@ -588,6 +597,10 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
         handlers: CampaignHandlers = fastapi_app.state.campaign
         return handlers
 
+    def _get_budget_handlers() -> BudgetHandlers:
+        handlers: BudgetHandlers = fastapi_app.state.budget
+        return handlers
+
     def _get_agent_handlers() -> AgentHandlers:
         handlers: AgentHandlers = fastapi_app.state.agent
         return handlers
@@ -608,6 +621,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     register_caution_tools(mcp, get_handlers=_get_caution_handlers)
     register_calibration_tools(mcp, get_handlers=_get_calibration_handlers)
     register_campaign_tools(mcp, get_handlers=_get_campaign_handlers)
+    register_budget_tools(mcp, get_handlers=_get_budget_handlers)
     register_agent_tools(mcp, get_handlers=_get_agent_handlers)
     register_conduct_run_tools(mcp, get_runtime=_get_compute_run_driver, get_deps=_get_deps)
     mcp_app = mcp.streamable_http_app()
@@ -632,6 +646,10 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                 # stubs, matching the ports' opt-in posture.
                 language_model_lookup_factory=PostgresLanguageModelLookup,
                 model_usage_lookup_factory=PostgresModelUsageLookup,
+                # Active-envelope lookup for the allocation gate stack and
+                # the CampaignClosed sealer; same opt-in posture (test mode
+                # keeps the never-Active stub).
+                allocation_lookup_factory=PostgresAllocationLookup,
                 run_actor_involvement_lookup_factory=PostgresRunActorInvolvementLookup,
                 consequence_lookup_factory=PostgresConsequenceLookup,
                 dataset_distribution_lookup_factory=PostgresDatasetDistributionLookup,
@@ -703,7 +721,11 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             object.__setattr__(
                 deps,
                 "spend_guard",
-                BudgetSpendGuard(event_store=deps.event_store, spend_lookup=deps.spend_lookup),
+                BudgetSpendGuard(
+                    event_store=deps.event_store,
+                    spend_lookup=deps.spend_lookup,
+                    allocation_lookup=deps.allocation_lookup,
+                ),
             )
             app.state.supply = wire_supply(deps)
             app.state.enclosure = wire_enclosure(deps)
@@ -733,6 +755,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             app.state.caution = wire_caution(deps)
             app.state.calibration = wire_calibration(deps)
             app.state.campaign = wire_campaign(deps)
+            app.state.budget = wire_budget(deps)
             app.state.agent = wire_agent(deps)
 
             app.state.compute_run_driver = ComputeRunDriver(
@@ -824,6 +847,10 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             register_caution_projections(registry, deps)
             register_calibration_projections(registry, deps)
             register_campaign_projections(registry, deps)
+            # Budget BC's projection (proj_budget_allocation_summary):
+            # the read model the envelope gate's AllocationLookup and
+            # the CampaignClosed sealer answer from.
+            register_budget_projections(registry, deps)
             # Agent BC's projection (proj_agent_summary). Path C
             # lock — state-side lifecycle timestamps live on the
             # projection.
@@ -832,6 +859,9 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             # (RunDebriefer). Conditional: only registered when
             # `kernel.llm` is wired (ANTHROPIC_API_KEY configured).
             register_agent_subscribers(registry, deps)
+            # budget BC's deterministic CampaignClosed -> seal reaction;
+            # unconditional (bookkeeping must not depend on an LLM key).
+            register_budget_subscribers(registry, deps)
             app.state.projections = registry
 
             # seed the AuthorityRevocationHolder Agent record FIRST: the
@@ -1078,6 +1108,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     register_caution_routes(fastapi_app)
     register_calibration_routes(fastapi_app)
     register_campaign_routes(fastapi_app)
+    register_budget_routes(fastapi_app)
     register_agent_routes(fastapi_app)
     register_conduct_run_routes(fastapi_app)
     # RFC 9728 Protected Resource Metadata. Discoverable
