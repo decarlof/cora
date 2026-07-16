@@ -22,10 +22,14 @@ the env var without importing BC-specific adapter classes.
     reachable but no real substrate is exercised).
   - `epics_ca`: production CA via aioca (`EpicsCaControlPort`).
   - `epics_pva`: production PVA via p4p (`EpicsPvaControlPort`).
+  - `tango`: Tango device attributes via PyTango (`TangoControlPort`).
+    Ships under the optional `tango` dependency group; selecting it
+    without the extra installed raises `ValueError` at construction
+    (probed via `_optional_tango.require_tango`).
 
-Future substrates (`tango`, `opc_ua`) land as additive code edits
-in `cora.infrastructure.control_port_route` (literal) plus a new
-arm in `_build_substrate` here.
+Future substrates (`opc_ua`) land as additive code edits in
+`cora.infrastructure.control_port_route` (literal) plus a new arm in
+`_build_substrate` here.
 
 ## Lifecycle
 
@@ -36,13 +40,15 @@ does NOT track individual adapters.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 from cora.infrastructure.control_port_route import ControlPortRoute, Substrate
 from cora.operation.adapters.control_port_registry import ControlPortRegistry
 from cora.operation.adapters.epics_ca_control_port import EpicsCaControlPort
 from cora.operation.adapters.epics_pva_control_port import EpicsPvaControlPort
 from cora.operation.adapters.in_memory_control_port import InMemoryControlPort
-from cora.operation.ports.control_port import ControlPort
+from cora.operation.adapters.tango_control_port import TangoControlPort
+from cora.operation.ports.control_port import ControlPort, SubstrateControlPort
 
 
 def build_control_port(routes: Sequence[ControlPortRoute]) -> ControlPort:
@@ -51,33 +57,45 @@ def build_control_port(routes: Sequence[ControlPortRoute]) -> ControlPort:
     Empty routes returns a single `InMemoryControlPort` (legacy
     default + test convenience). Non-empty routes returns a
     `ControlPortRegistry` populated with the configured substrate
-    adapters per prefix.
+    adapters per prefix. `in_memory` routes go through
+    `register_control_port` (the registry wraps the `str`-surfaced adapter);
+    the real substrate adapters register directly on the typed surface.
     """
     if not routes:
         return InMemoryControlPort()
     registry = ControlPortRegistry()
     for route in routes:
-        registry.register(
-            route.prefix,
-            _build_substrate(route.substrate),
-            is_simulated=route.is_simulated,
-        )
+        if route.substrate == "in_memory":
+            registry.register_control_port(
+                route.prefix, InMemoryControlPort(), is_simulated=route.is_simulated
+            )
+        else:
+            registry.register_substrate_port(
+                route.prefix,
+                _build_substrate(route.substrate),
+                route.substrate,
+                is_simulated=route.is_simulated,
+            )
     return registry
 
 
-def _build_substrate(substrate: Substrate) -> ControlPort:
-    """Construct the per-substrate adapter with deployment defaults.
+def _build_substrate(substrate: Substrate) -> SubstrateControlPort[Any]:
+    """Construct the per-substrate typed adapter with deployment defaults.
+
+    Handles the typed-address substrate adapters only; `in_memory` is
+    registered through `ControlPortRegistry.register_control_port` in
+    `build_control_port` because it is `str`-surfaced.
 
     Per-adapter constructor kwargs (timeouts, etc.) ride on the
     adapter defaults today; a future iteration may widen
     `ControlPortRoute` with optional per-route overrides
     (`timeout_s`, etc.) when a real deployment surfaces the need.
     """
-    if substrate == "in_memory":
-        return InMemoryControlPort()
     if substrate == "epics_ca":
         return EpicsCaControlPort()
-    return EpicsPvaControlPort()
+    if substrate == "epics_pva":
+        return EpicsPvaControlPort()
+    return TangoControlPort()
 
 
 __all__ = ["build_control_port"]

@@ -23,6 +23,15 @@ from cora.operation.adapters.control_port_registry import ControlPortRegistry
 from cora.operation.adapters.epics_ca_control_port import EpicsCaControlPort
 from cora.operation.adapters.epics_pva_control_port import EpicsPvaControlPort
 from cora.operation.adapters.in_memory_control_port import InMemoryControlPort
+from cora.operation.adapters.tango_control_port import TangoControlPort
+from cora.operation.ports.control_port import (
+    ControlNotConnectedError,
+    NoAdapterForAddressError,
+)
+
+
+def _no_tango_probe(_substrate: str) -> None:
+    """Neutralised `require_tango`: PyTango is absent in the base test env."""
 
 
 @pytest.mark.unit
@@ -32,11 +41,18 @@ def test_build_control_port_with_empty_routes_returns_in_memory_port() -> None:
 
 
 @pytest.mark.unit
-def test_build_control_port_with_single_in_memory_route_returns_registry() -> None:
+async def test_build_control_port_with_single_in_memory_route_returns_registry() -> None:
     port = build_control_port([ControlPortRoute(prefix="2bma:", substrate="in_memory")])
     assert isinstance(port, ControlPortRegistry)
-    routed = port.route("2bma:rot:val")
-    assert isinstance(routed, InMemoryControlPort)
+    # in_memory routes ride the registry's str-port wrapper (an internal
+    # detail), so assert behaviour rather than the wrapper type: a matched
+    # address dispatches to the in-memory adapter, which raises
+    # ControlNotConnectedError (its response for an unseeded address), NOT the
+    # NoAdapterForAddressError an unrouted prefix would raise.
+    with pytest.raises(ControlNotConnectedError):
+        await port.read("2bma:rot:val")
+    with pytest.raises(NoAdapterForAddressError):
+        await port.read("7bma:rot:val")
 
 
 @pytest.mark.unit
@@ -72,6 +88,27 @@ def test_build_control_port_with_mixed_routes_picks_right_adapter_per_prefix() -
 
 
 @pytest.mark.unit
+def test_build_control_port_with_tango_route_constructs_tango_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `tango` route builds a `TangoControlPort`.
+
+    The adapter probes PyTango importability at construction; PyTango is not
+    installed in the base test environment, so the probe is neutralised here
+    to exercise the factory arm rather than the missing-extra path (that path
+    is covered by `test_require_tango_raises_value_error_when_pytango_absent`).
+    """
+    monkeypatch.setattr(
+        "cora.operation.adapters.tango_control_port.require_tango",
+        _no_tango_probe,
+    )
+    port = build_control_port([ControlPortRoute(prefix="id19/", substrate="tango")])
+    assert isinstance(port, ControlPortRegistry)
+    routed = port.route("id19/bsh/1/state")
+    assert isinstance(routed, TangoControlPort)
+
+
+@pytest.mark.unit
 def test_control_port_route_rejects_empty_prefix() -> None:
     with pytest.raises(ValidationError):
         ControlPortRoute(prefix="", substrate="in_memory")
@@ -80,7 +117,7 @@ def test_control_port_route_rejects_empty_prefix() -> None:
 @pytest.mark.unit
 def test_control_port_route_rejects_unknown_substrate() -> None:
     with pytest.raises(ValidationError):
-        ControlPortRoute.model_validate({"prefix": "x:", "substrate": "tango"})
+        ControlPortRoute.model_validate({"prefix": "x:", "substrate": "opc_ua"})
 
 
 @pytest.mark.unit
