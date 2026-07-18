@@ -471,6 +471,25 @@ class Settings(BaseSettings):
     # `cora.operation.adapters.control_port_config` for the factory.
     control_port_routes: list[ControlPortRoute] = []
 
+    # Deployment-wide control-write switch. False (default) means CORA
+    # may observe every configured route but drives none: every adapter
+    # `build_control_port` hands the registry is wrapped in a
+    # `ReadOnlyControlPort`, so a write raises
+    # `ControlWritesDisabledError` before any substrate is contacted.
+    #
+    # Default-deny is deliberate and is the safety mechanism behind an
+    # observe-only deployment (the APS 2-BM pilot posture). It cannot be
+    # partially applied: it admits no per-substrate or per-route
+    # exemption, so a config that forgets something fails closed rather
+    # than silently driving hardware. `ControlPortRoute.read_only` is
+    # the per-route counterpart, but it defaults to writable and so is
+    # expressiveness within a writable deployment, NOT a safety gate.
+    #
+    # A deployment that drives hardware sets `CONTROL_WRITES_ENABLED=true`
+    # once, on purpose. Local development and tests that exercise writes
+    # through Settings must set it too; that keystroke is the point.
+    control_writes_enabled: bool = False
+
     # ComputePort substrate selection for the conduct runtime.
     # `in_memory` (default) is the Simulated fake: the conduct surface
     # is reachable but every job is Simulated, so no real subprocess
@@ -483,6 +502,28 @@ class Settings(BaseSettings):
     # `cora.operation.adapters.compute_port_config`.
     compute_substrate: ComputeSubstrate = "in_memory"
     compute_default_timeout_s: float = 3600.0
+
+    # Exactly what the `local_process` substrate may spawn. Empty
+    # (default) permits NOTHING, so selecting local_process without
+    # naming an executable yields a port that refuses every job rather
+    # than one that runs any. The CHECK matches command[0] exactly: no
+    # PATH resolution, no basename fallback. Read from
+    # `COMPUTE_PERMITTED_EXECUTABLES` as JSON, for example:
+    #
+    #   COMPUTE_PERMITTED_EXECUTABLES='["/opt/conda/bin/tomopy"]'
+    #
+    # Declare ABSOLUTE paths. The check is exact, but the spawn still
+    # PATH-resolves a bare name afterwards, so allowlisting `tomopy`
+    # permits whatever PATH finds then. A request cannot reach that (the
+    # conduct body carries no env), but a writable PATH entry on the
+    # host would still decide what runs.
+    #
+    # Allowlist TOOLS, never interpreters: permitting `python` or `sh`
+    # re-opens arbitrary execution via `-c`, and the check cannot tell.
+    # This bounds WHAT runs; it does not authorize the conduct path (no
+    # Trust policy gates the spawn). See `cora_allow_raw_conduct` below
+    # and docs/stack/deployment.md.
+    compute_permitted_executables: frozenset[str] = frozenset()
 
     # When True (default, migration window), the conduct endpoint still
     # accepts a raw caller-supplied `command` for a Method that has NO

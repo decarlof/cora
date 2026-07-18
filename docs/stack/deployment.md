@@ -14,6 +14,201 @@ The load-bearing auth vars (full list in `.env.example`):
 | `ALLOW_PERMISSIVE_AUTHZ` | `false` | Production-tier escape hatch: set `true` to run the permit-everyone `AllowAllAuthorize` stub on purpose in a `prod`/`production`/`staging` env (airgapped / single-operator pilot) |
 | `IDENTITY_PROVIDERS` | unset → legacy `X-Principal-Id` header mode | JSON list of `IdentityProviderConfig` entries (see [Auth](auth.md)); enables bearer-token mode at the HTTP edge |
 | `ANTHROPIC_API_KEY` | unset → AI subscribers log-and-skip | When you want RunDebriefer / CautionDrafter live |
+| `CONTROL_WRITES_ENABLED` | `false` → CORA never drives through the ControlPort | Set `true` only when this deployment is meant to actuate hardware (see below; it does not cover `COMPUTE_SUBSTRATE`) |
+| `CONTROL_PORT_ROUTES` | unset → `InMemoryControlPort` (no real substrate) | When CORA talks to a real control system. JSON list of `ControlPortRoute` |
+
+### Observe-only deployments
+
+`CONTROL_WRITES_ENABLED` defaults to `false`, and that default is the
+mechanism behind an observe-only deployment such as the APS 2-BM pilot.
+Every adapter the ControlPort factory builds is wrapped in a
+`ReadOnlyControlPort`: `read` and `subscribe` pass through, and `write`
+raises `ControlWritesDisabledError` before any substrate is contacted.
+The Conductor records that refusal as a step failure naming the address.
+
+Two properties are worth stating plainly, because they are what make the
+observe-only claim true rather than aspirational:
+
+- **It cannot be partially applied.** There is no per-substrate or
+  per-route exemption, not even for `in_memory`. Inferring safety from
+  the substrate is the mistake `is_simulated` exists to prevent: a soft
+  IOC speaks real Channel Access.
+- **It fails closed.** The refusal is decided when the port is built, not
+  consulted at write time, so there is no "flag could not be read" state
+  that silently permits a write.
+
+`ControlPortRoute.read_only` is the per-route counterpart, but it
+defaults to writable, so it is expressiveness within a *writable*
+deployment ("CORA may drive the sample stage but must never touch the
+shutter"), NOT the safety gate. To make a deployment observe-only, use
+the switch.
+
+Scope this honestly when describing the pilot: the switch closes CORA's
+*modeled* actuation path (`ControlPort`). It does not by itself make the
+host incapable of touching the beamline.
+
+The other path is `ComputePort`. With `COMPUTE_SUBSTRATE=local_process` a
+conduct job's argv runs as an OS subprocess under the API service
+account, so an argv like `["caput", ...]` reaches a control system
+without passing through any ControlPort, whatever
+`CONTROL_WRITES_ENABLED` says. Two properties make this sharper than it
+first looks: with `CORA_ALLOW_RAW_CONDUCT=true` (the current default) the
+argv can come straight from the request body for any Method with no
+`launch_spec`; and no Trust policy gates the spawn, because the Authorize
+port gates the run transition (`complete_run` / `abort_run`), which
+happens after the subprocess has already run.
+
+What keeps this inert today is the default: `compute_substrate` is
+`in_memory` (`cora.infrastructure.config`), which mints a Simulated
+result and spawns nothing. An observe-only deployment leaves it there.
+
+If you do enable `local_process`, `COMPUTE_PERMITTED_EXECUTABLES` bounds
+what it may spawn. The substrate refuses any `command[0]` outside the
+set, before the spawn. It is EMPTY by default and empty permits nothing,
+so enabling the substrate without naming an executable yields a port that
+refuses every job rather than one that runs any. Matching is exact: the
+check does no PATH resolution and no basename fallback, so
+`/tmp/evil/tomopy` does not ride in on an allowlisted `tomopy`.
+
+Two rules follow, and neither is optional:
+
+- **Allowlist tools, never interpreters.** Permitting `python` or `sh`
+  re-opens arbitrary execution through `-c`, and the check cannot tell
+  the difference. Permit the tomopy binary, not the thing that can run
+  it.
+- **Declare absolute paths.** The check is exact, but the spawn still
+  resolves a bare name against PATH afterwards, so allowlisting `tomopy`
+  permits whatever PATH finds at that moment. A request cannot reach
+  that (the conduct body carries no `env`), but a writable PATH entry on
+  the host would still decide what runs. An absolute path settles it.
+
+The allowlist is the belt, not the trousers: it bounds WHAT runs, it does
+not authorize the path. Nothing in Trust gates the spawn, so every gate
+here is authentication or configuration. The complementary fix is to give
+every compute Method a `launch_spec`, so argv builds server-side from the
+vetted, event-sourced recipe, and then set `CORA_ALLOW_RAW_CONDUCT=false`,
+which deletes the caller-supplied argv path instead of bounding it. The
+two compose: the allowlist bounds a `launch_spec`'s `base_command` at
+submit exactly as it bounds a raw one, so a Method author cannot name an
+executable this host does not permit either.
+
+The gates that do and do not apply to a submit are documented at the top
+of `cora.api._conduct_run_route`.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `COMPUTE_SUBSTRATE` | `in_memory` | `local_process` spawns subprocesses on this host |
+| `COMPUTE_PERMITTED_EXECUTABLES` | empty (permits nothing) | Exact-match allowlist for `command[0]` |
+| `CORA_ALLOW_RAW_CONDUCT` | `true` | `false` rejects request-supplied argv outright |
+
+## Container image
+
+`apps/api/Dockerfile`. Build from the repo root:
+
+```
+docker build -f apps/api/Dockerfile -t cora-api:<tag> apps/api
+```
+
+Three facts about this image are not negotiable, and each one is a
+property of the EPICS ecosystem rather than a preference:
+
+- **It is linux/amd64, pinned.** `epicscorelibs`, `pvxslibs` and `p4p`
+  publish x86_64 wheels only; there is no linux/aarch64 wheel for any of
+  them. On an arm64 host the build runs under emulation and is slow.
+  That is the cost of the wheels being what they are.
+- **The builder needs gcc/g++.** `aioca` publishes no linux wheel at
+  all, so it compiles its Channel Access extension against
+  `epicscorelibs` at install time. The compiler stays in the builder
+  stage and never reaches the runtime image.
+- **One process per container.** No `--workers`. The lifespan starts
+  in-process background workers (projection worker, subscribers,
+  watchers); forking N copies would run N of each against one database.
+  Scale with replicas, not workers.
+
+The image does not run migrations. Atlas applies them out of band
+(`make migrate-apply`) with a Go binary that is deliberately not
+installed here: migrations are forward-only and operator-sequenced, so
+an image that migrated itself on boot would let a rolling deploy race
+two schema versions against one database. Apply migrations first, then
+roll the image.
+
+The image carries no configuration. `create_app()` runs at import and
+its boot gates raise there, so a misconfigured container exits instead
+of serving: `APP_ENV=prod` with no `TRUST_POLICY_ID` dies at import
+rather than starting up permissive. Supply config as environment
+variables (see `.env.example`), and note that `APP_ENV=test` builds the
+in-memory kernel with no persistence, so it must never be set on a real
+deployment.
+
+The `HEALTHCHECK` probes `/health` (liveness) only, never `/readyz`.
+Docker restarts a container whose HEALTHCHECK fails, and restarting an
+app because its database is down is how one outage becomes a crash
+loop. Readiness belongs on the orchestrator's `readinessProbe`.
+
+Still deferred, and each now has a live trigger: an image registry, the
+orchestrator (k8s / Cloud Run / bare VM + systemd), TLS termination,
+and secrets management. See `docs/stack/deferred.md`.
+
+## Probes
+
+Two endpoints, both unauthenticated (a probe that has to hold a token
+reports an expired token as a dead process) and both answering
+different questions.
+
+| Endpoint | Question | Checks | Point it at |
+| --- | --- | --- | --- |
+| `GET /health` | Is the process alive? | Nothing, deliberately | `livenessProbe` |
+| `GET /readyz` | Can it serve a correct request? | Postgres | `readinessProbe` |
+
+`/health` checks nothing and must keep checking nothing. Every
+dependency it could check is one a restart cannot fix, and CORA is a
+worse case than most: the pool is built once at startup with no retry,
+so Postgres being down at boot exits the process before it binds a
+socket. A liveness probe that checked the DB would therefore restart
+every pod into an outage the restart cannot mend, converting one
+database blip into a fleet-wide crash loop.
+
+`/readyz` returns 200 `{"status": "ready", ...}` or 503
+`{"status": "not_ready", "database": "..."}`. `database` is a fixed
+vocabulary: `ok`, `unreachable`, `saturated`, `closing`, `skipped`
+(this deployment has no pool, the in-memory kernel), `error`. The body
+carries no URLs, no driver error text, and no projection or bounded
+context names: it is unauthenticated, and none of that helps a probe
+while all of it describes the deployment to whoever can reach it. The
+logs carry the detail.
+
+Postgres is the only check, because readiness must report what can
+CHANGE after a successful boot rather than restate boot. Every config
+gate runs at import and every seed check at lifespan start, so a
+process alive enough to answer `/readyz` has already passed all of
+them. Postgres is the one thing that can fail afterwards.
+
+Projection health is deliberately not gated on. A wedged projection is
+a global condition: it would pull every replica at once, including the
+pod hosting the in-band repair tool. Watch projection lag with a metric
+and an alert, not with a traffic-routing signal.
+
+**Probe budget invariant.** The app bounds `/readyz` at 1.5s total.
+Set the orchestrator's own probe timeout ABOVE that (2s or more).
+Nothing enforces this. If the orchestrator gives up first, its
+disconnect rather than the app's timeout ends the request, and
+`/readyz` silently degrades from a diagnostic endpoint into a hang
+detector: the `{"database": "saturated"}` body that is the entire point
+never gets written. Suggested: `timeoutSeconds: 2`, `periodSeconds: 10`,
+`failureThreshold: 3`.
+
+Two limits worth knowing before the pilot:
+
+- **Readiness buys little at one replica**, which is the 2-BM pilot's
+  shape. Pulling the only pod from a Service gives callers
+  connection-refused instead of a 503 they can read. At one replica,
+  treat `/readyz` as a signal to scrape and alert on; its traffic-shifting
+  value arrives at replica two.
+- **There is no graceful drain.** Nothing flips `/readyz` to not_ready
+  before shutdown begins, so during a rolling deploy the endpoint still
+  answers ready while the app is tearing down. `database: closing` is
+  the symptom of that gap, not a substitute for fixing it. Expect
+  rolling deploys to drop in-flight requests until a drain lands.
 
 ### Startup boot gate
 
@@ -162,7 +357,8 @@ This returns the sorted list of commands the named principal can run via the nam
 
 | Concern | Status | Trigger |
 | --- | --- | --- |
-| Container image + registry | Deferred | First non-local deployment |
+| Container image | SHIPPED | `apps/api/Dockerfile`; see "Container image" above |
+| Image registry | Deferred | Where the orchestrator pulls from; decided with the orchestrator |
 | Runtime orchestrator (k8s / Cloud Run / ECS / bare VMs) | Deferred | First non-local deployment |
 | Event-sourced `ActorIdpBindings` (JIT Actor provisioning) | Deferred | First case where adding an operator is too high-friction via config-time bindings |
 | `trust.check_others` permission separation | Watch item | When ABAC lands or first cross-tenant deploy |
