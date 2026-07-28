@@ -17,9 +17,12 @@ side); it only owns SIDE-EFFECTING subscribers that emit new events.
 The deterministic subscribers (AuthorityRevocationHolder,
 CautionPromoter) register independently of `kernel.llm`. The
 LLM-backed subscribers (RunDebriefer, CautionDrafter) register only
-when `kernel.llm` is wired (`ANTHROPIC_API_KEY` set); if it is None
-they are skipped with a warning rather than refusing to boot a
-deployment that wants to defer Agent rollout.
+when `kernel.llm` is wired, which needs BOTH `llm_enabled` (the
+switch, default off) and `ANTHROPIC_API_KEY` (the credential); if it
+is None they are skipped with a warning rather than refusing to boot a
+deployment that wants to defer Agent rollout. These two are the seam
+through which experiment metadata would leave the facility and tokens
+would be spent, on every terminal Run, so the switch defaults off.
 
 ## Registered subscribers
 
@@ -65,6 +68,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cora.agent.build_llm import llm_unwired_reason
 from cora.agent.subscribers.authority_revocation_holder import (
     make_authority_revocation_holder_subscriber,
 )
@@ -136,7 +140,7 @@ def register_agent_subscribers(registry: ProjectionRegistry, deps: Kernel) -> No
         _log.warning(
             "agent_subscriber.skipped",
             subscribers=["run_debriefer", "caution_drafter"],
-            reason="kernel.llm is None (ANTHROPIC_API_KEY not configured)",
+            reason=llm_unwired_reason(deps.settings),
         )
         return
 
