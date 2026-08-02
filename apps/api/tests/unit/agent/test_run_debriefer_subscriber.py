@@ -660,7 +660,7 @@ async def test_apply_skips_entirely_when_agent_deprecated() -> None:
     )
     deprecated = AgentDeprecated(
         agent_id=RUN_DEBRIEFER_AGENT_ID,
-        reason="model regression",
+        reason="Superseded",
         occurred_at=_NOW,
     )
     await store.append(

@@ -239,7 +239,7 @@ def test_post_runs_returns_404_when_subject_does_not_exist() -> None:
 def test_post_runs_returns_409_when_plan_is_deprecated() -> None:
     with TestClient(create_app()) as client:
         plan_id, subject_id = _setup_full_chain(client)
-        deprecate = client.post(f"/plans/{plan_id}/deprecate")
+        deprecate = client.post(f"/plans/{plan_id}/deprecate", json={"reason": "Superseded"})
         assert deprecate.status_code == 204
         response = client.post(
             "/runs",
@@ -303,7 +303,7 @@ def test_post_runs_returns_409_when_asset_decommissioned_after_plan_bind() -> No
         ).json()["plan_id"]
         # Now Activate then Decommission the Asset (simulating drift).
         client.post(f"/assets/{asset_id}/activate")
-        client.post(f"/assets/{asset_id}/decommission")
+        client.post(f"/assets/{asset_id}/decommission", json={"reason": "retired from service"})
         response = client.post("/runs", json={"name": "X", "plan_id": plan_id})
     assert response.status_code == 409
 

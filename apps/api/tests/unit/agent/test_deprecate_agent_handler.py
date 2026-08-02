@@ -1,7 +1,7 @@
 """Application-handler tests for the `deprecate_agent` slice."""
 
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -12,13 +12,18 @@ from cora.agent.aggregates.agent import (
     event_type_name,
     to_payload,
 )
-from cora.agent.aggregates.agent.events import AgentDefined, AgentDeprecated
+from cora.agent.aggregates.agent.events import (
+    AgentDefined,
+    AgentDeprecated,
+    AgentVersioned,
+)
 from cora.agent.errors import UnauthorizedError
 from cora.agent.features import deprecate_agent
 from cora.agent.features.deprecate_agent import DeprecateAgent
 from cora.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from cora.infrastructure.event_envelope import to_new_event
 from cora.infrastructure.kernel import Kernel
+from cora.shared.deprecation import DeprecationReason
 from tests.unit._helpers import build_deps as _build_deps_shared
 
 _T0 = datetime(2026, 5, 16, 11, 0, 0, tzinfo=UTC)
@@ -75,6 +80,30 @@ async def _seed_defined_agent(store: InMemoryEventStore) -> None:
     )
 
 
+async def _seed_versioned_agent(store: InMemoryEventStore) -> None:
+    """Defined -> Versioned, so `deprecate` is exercised from the OTHER
+    permitted source rather than repeating the Defined path."""
+    await _seed_defined_agent(store)
+    versioned = AgentVersioned(agent_id=_AGENT_ID, version="v2", occurred_at=_T0)
+    await store.append(
+        stream_type="Agent",
+        stream_id=_AGENT_ID,
+        expected_version=1,
+        events=[
+            to_new_event(
+                event_type=event_type_name(versioned),
+                payload=to_payload(versioned),
+                occurred_at=versioned.occurred_at,
+                event_id=uuid4(),
+                command_name="VersionAgent",
+                correlation_id=_CORRELATION_ID,
+                causation_id=None,
+                principal_id=_PRINCIPAL_ID,
+            )
+        ],
+    )
+
+
 @pytest.mark.unit
 async def test_handler_deprecates_a_defined_agent_with_reason() -> None:
     store = InMemoryEventStore()
@@ -82,29 +111,29 @@ async def test_handler_deprecates_a_defined_agent_with_reason() -> None:
     deps = _build_deps(event_store=store)
     handler = deprecate_agent.bind(deps)
     await handler(
-        DeprecateAgent(agent_id=_AGENT_ID, reason="model retired"),
+        DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
         principal_id=_PRINCIPAL_ID,
         correlation_id=_CORRELATION_ID,
     )
     events, version = await store.load("Agent", _AGENT_ID)
     assert version == 2
     assert events[-1].event_type == "AgentDeprecated"
-    assert events[-1].payload["reason"] == "model retired"
+    assert events[-1].payload["reason"] == "Superseded"
 
 
 @pytest.mark.unit
-async def test_handler_deprecates_with_no_reason() -> None:
+async def test_handler_deprecates_a_versioned_agent() -> None:
     store = InMemoryEventStore()
-    await _seed_defined_agent(store)
+    await _seed_versioned_agent(store)
     deps = _build_deps(event_store=store)
     handler = deprecate_agent.bind(deps)
     await handler(
-        DeprecateAgent(agent_id=_AGENT_ID, reason=None),
+        DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
         principal_id=_PRINCIPAL_ID,
         correlation_id=_CORRELATION_ID,
     )
     events, _ = await store.load("Agent", _AGENT_ID)
-    assert events[-1].payload["reason"] is None
+    assert events[-1].payload["reason"] == "Superseded"
 
 
 @pytest.mark.unit
@@ -113,7 +142,7 @@ async def test_handler_raises_not_found_for_unknown_agent() -> None:
     handler = deprecate_agent.bind(deps)
     with pytest.raises(AgentNotFoundError):
         await handler(
-            DeprecateAgent(agent_id=_AGENT_ID),
+            DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
             principal_id=_PRINCIPAL_ID,
             correlation_id=_CORRELATION_ID,
         )
@@ -123,7 +152,7 @@ async def test_handler_raises_not_found_for_unknown_agent() -> None:
 async def test_handler_raises_cannot_deprecate_when_already_deprecated() -> None:
     store = InMemoryEventStore()
     await _seed_defined_agent(store)
-    deprecated = AgentDeprecated(agent_id=_AGENT_ID, reason=None, occurred_at=_T1)
+    deprecated = AgentDeprecated(agent_id=_AGENT_ID, reason="Superseded", occurred_at=_T1)
     await store.append(
         stream_type="Agent",
         stream_id=_AGENT_ID,
@@ -145,7 +174,7 @@ async def test_handler_raises_cannot_deprecate_when_already_deprecated() -> None
     handler = deprecate_agent.bind(deps)
     with pytest.raises(AgentCannotDeprecateError):
         await handler(
-            DeprecateAgent(agent_id=_AGENT_ID),
+            DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
             principal_id=_PRINCIPAL_ID,
             correlation_id=_CORRELATION_ID,
         )
@@ -157,7 +186,7 @@ async def test_handler_denies_via_authorize_port() -> None:
     handler = deprecate_agent.bind(deps)
     with pytest.raises(UnauthorizedError):
         await handler(
-            DeprecateAgent(agent_id=_AGENT_ID),
+            DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
             principal_id=_PRINCIPAL_ID,
             correlation_id=_CORRELATION_ID,
         )
@@ -176,7 +205,7 @@ async def test_handler_denied_does_not_write_to_stream() -> None:
     handler = deprecate_agent.bind(deps)
     with pytest.raises(UnauthorizedError):
         await handler(
-            DeprecateAgent(agent_id=_AGENT_ID),
+            DeprecateAgent(agent_id=_AGENT_ID, reason=DeprecationReason.SUPERSEDED),
             principal_id=_PRINCIPAL_ID,
             correlation_id=_CORRELATION_ID,
         )

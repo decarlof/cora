@@ -26,6 +26,7 @@ from cora.agent.features.get_agent.query import GetAgent
 from cora.infrastructure.mcp_principal import get_mcp_principal_id
 from cora.infrastructure.observability import current_correlation_id
 from cora.infrastructure.routing import get_mcp_surface_id
+from cora.shared.deprecation import DeprecationReason
 
 
 class ModelRefOutput(BaseModel):
@@ -58,7 +59,7 @@ class AgentOutput(BaseModel):
     capabilities: list[str]
     versioned_at: datetime | None = None
     deprecated_at: datetime | None = None
-    deprecation_reason: str | None = None
+    deprecation_reason: DeprecationReason | None = None
 
 
 def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
@@ -110,7 +111,5 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
             capabilities=sorted(c.value for c in agent.capabilities),
             versioned_at=timestamps.versioned_at if timestamps is not None else None,
             deprecated_at=timestamps.deprecated_at if timestamps is not None else None,
-            deprecation_reason=(
-                agent.deprecation_reason.value if agent.deprecation_reason is not None else None
-            ),
+            deprecation_reason=agent.deprecation_reason,
         )

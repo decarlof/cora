@@ -11,9 +11,9 @@ Five genesis-and-lifecycle events:
                                   Defined/Registered genesis convention
   - `AllocationActivated`      -- transition (Granted -> Active); opens
                                   the spend window
-  - `AllocationCeilingAmended` -- non-transition amendment (Granted |
+  - `AllocationCeilingUpdated` -- non-transition update (Granted |
                                   Active); PUT semantics, the supplied
-                                  ceiling IS the post-amend ceiling
+                                  ceiling IS the post-update ceiling
   - `AllocationSealed`         -- transition (Active -> Sealed);
                                   terminal, carries the final-spend
                                   snapshot
@@ -28,9 +28,30 @@ from VO validation churn.
 `granted_by` / `activated_by` / `sealed_by` carry the acting
 principal on the PAYLOAD (not only the envelope) because the folded
 state records those fact-acts as `<verb>_at` / `<verb>_by` pairs per
-[[project_fold_symmetry_design]]; `AllocationCeilingAmended` and
+[[project_fold_symmetry_design]]; `AllocationCeilingUpdated` and
 `AllocationVoided` fold no timestamp, so their actor lives only on
 the envelope (`StoredEvent.principal_id`).
+
+## Schema-evolution deviation, 2026-08-01
+
+`docs/reference/modeling.md` says breaking changes get a NEW event type and
+the evolver reads both forever. This module deviates twice and the deviation
+is deliberate, not an oversight:
+
+  - `reason` was added as a REQUIRED field, and `from_stored` reads
+    `payload["reason"]` rather than `payload.get(...)`, so a payload written
+    before 2026-08-01 raises instead of folding.
+  - `AllocationCeilingAmended` was renamed to `AllocationCeilingUpdated`. The
+    stored discriminator is `type(event).__name__`, so it moved with the class
+    and no legacy `case "AllocationCeilingAmended":` arm was added.
+
+Justification: no such payload exists. The only events any migration ever
+seeds are `PolicyDefined` and `SurfaceDefined`; the old discriminator appears
+nowhere in the tree; `tests/fixtures/event_corpus/` holds no fixture for it.
+A compat arm would be dead code guarding data that was never written, which
+the corpus README explicitly discourages. This note is the record the policy
+asks for. If a deployment ever accumulates real streams, this deviation is
+spent and the next breaking change follows the policy.
 """
 
 from dataclasses import dataclass
@@ -84,13 +105,13 @@ class AllocationActivated:
 
 
 @dataclass(frozen=True)
-class AllocationCeilingAmended:
-    """The ceiling was amended (Granted | Active; PUT semantics).
+class AllocationCeilingUpdated:
+    """The ceiling was updated (Granted | Active; PUT semantics).
 
-    The supplied ceiling IS the post-amend ceiling, not a delta: the
+    The supplied ceiling IS the post-update ceiling, not a delta: the
     cost-overrun tighten lever must land at an exact number the
     operator chose, and a delta would compound across retries.
-    No status change; amendment is not a lifecycle step.
+    No status change; an update is not a lifecycle step.
     """
 
     allocation_id: UUID
@@ -136,7 +157,7 @@ class AllocationVoided:
 AllocationEvent = (
     AllocationGranted
     | AllocationActivated
-    | AllocationCeilingAmended
+    | AllocationCeilingUpdated
     | AllocationSealed
     | AllocationVoided
 )
@@ -180,7 +201,7 @@ def to_payload(event: AllocationEvent) -> dict[str, Any]:
                 "activated_by": str(activated_by),
                 "occurred_at": occurred_at.isoformat(),
             }
-        case AllocationCeilingAmended(
+        case AllocationCeilingUpdated(
             allocation_id=allocation_id,
             ceiling_usd=ceiling_usd,
             occurred_at=occurred_at,
@@ -258,10 +279,10 @@ def from_stored(stored: StoredEvent) -> AllocationEvent:
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
             )
-        case "AllocationCeilingAmended":
+        case "AllocationCeilingUpdated":
             return deserialize_or_raise(
-                "AllocationCeilingAmended",
-                lambda: AllocationCeilingAmended(
+                "AllocationCeilingUpdated",
+                lambda: AllocationCeilingUpdated(
                     allocation_id=UUID(payload["allocation_id"]),
                     ceiling_usd=payload["ceiling_usd"],
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
@@ -294,7 +315,7 @@ def from_stored(stored: StoredEvent) -> AllocationEvent:
 
 __all__ = [
     "AllocationActivated",
-    "AllocationCeilingAmended",
+    "AllocationCeilingUpdated",
     "AllocationEvent",
     "AllocationGranted",
     "AllocationSealed",

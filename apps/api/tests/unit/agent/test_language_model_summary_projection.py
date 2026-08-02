@@ -204,7 +204,7 @@ async def test_language_model_deprecated_updates_status_and_deprecated_at() -> N
         "LanguageModelDeprecated",
         {
             "language_model_id": str(_LANGUAGE_MODEL_ID),
-            "reason": "Facility withdrew approval",
+            "reason": "Superseded",
             "occurred_at": _NOW.isoformat(),
         },
     )

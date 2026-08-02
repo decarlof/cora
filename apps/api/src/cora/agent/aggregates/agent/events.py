@@ -26,6 +26,27 @@ on the read path for forward-compat.
 
 The deprecation reason on `AgentDeprecated` is a closed bounded-text
 value (not an enum); travels as `str | None` in the payload.
+
+## Schema-evolution deviation, 2026-08-01
+
+`docs/reference/modeling.md` says breaking changes get a NEW event type and
+the evolver reads both forever. This module deviates twice and the deviation
+is deliberate, not an oversight:
+
+  - `reason` was added as a REQUIRED field, and `from_stored` reads
+    `payload["reason"]` rather than `payload.get(...)`, so a payload written
+    before 2026-08-01 raises instead of folding.
+  - `AgentTargetPlanSet` was renamed to `AgentTargetPlanUpdated`. The stored
+    discriminator is `type(event).__name__`, so it moved with the class and no
+    legacy `case "AgentTargetPlanSet":` arm was added.
+
+Justification: no such payload exists. The only events any migration ever
+seeds are `PolicyDefined` and `SurfaceDefined`; the old discriminator appears
+nowhere in the tree; `tests/fixtures/event_corpus/` holds no fixture for it.
+A compat arm would be dead code guarding data that was never written, which
+the corpus README explicitly discourages. This note is the record the policy
+asks for. If a deployment ever accumulates real streams, this deviation is
+spent and the next breaking change follows the policy.
 """
 
 from dataclasses import dataclass
@@ -132,15 +153,16 @@ class AgentDeprecated:
     """An Agent was deprecated (terminal).
 
     Source set is `{Defined, Versioned, Suspended}` — operators
-    can retire a paused agent without resuming first. `reason` is
-    an optional operator-supplied bounded-text value (1-500 chars).
+    can retire a paused agent without resuming first. `reason` is a
+    required `DeprecationReason`: whether work this Agent already
+    produced still stands is not a question an operator may decline.
 
     The deprecating actor's id lives on the envelope
     (`StoredEvent.principal_id`); no actor field on the payload.
     """
 
     agent_id: UUID
-    reason: str | None
+    reason: str
     occurred_at: datetime
 
 
@@ -218,10 +240,17 @@ class AgentToolRevoked:
     """One MCP tool was revoked from an Agent.
 
     Idempotent: re-revoking an already-revoked tool emits NO event.
+
+    `reason` is operator free text (audit denorm on the immutable log).
+    Required for the same cause as `PolicyGrantRevoked`: this removes a
+    live capability from an autonomous principal, which is a governance
+    act rather than the structural set-editing its `*Removed` siblings
+    do. Adding a tool stays silent; taking one away does not.
     """
 
     agent_id: UUID
     tool_name: str
+    reason: str
     occurred_at: datetime
 
 
@@ -245,7 +274,7 @@ class AgentBudgetUpdated:
 
 
 @dataclass(frozen=True)
-class AgentTargetPlanSet:
+class AgentTargetPlanUpdated:
     """The Agent's runtime target Plan was set or cleared.
 
     `target_plan_id` is the recipe Plan an autonomous agent (the RunInitiator)
@@ -271,7 +300,7 @@ AgentEvent = (
     | AgentToolGranted
     | AgentToolRevoked
     | AgentBudgetUpdated
-    | AgentTargetPlanSet
+    | AgentTargetPlanUpdated
 )
 
 
@@ -360,10 +389,16 @@ def to_payload(event: AgentEvent) -> dict[str, Any]:
                 "tool_name": tool_name,
                 "occurred_at": occurred_at.isoformat(),
             }
-        case AgentToolRevoked(agent_id=agent_id, tool_name=tool_name, occurred_at=occurred_at):
+        case AgentToolRevoked(
+            agent_id=agent_id,
+            tool_name=tool_name,
+            reason=reason,
+            occurred_at=occurred_at,
+        ):
             return {
                 "agent_id": str(agent_id),
                 "tool_name": tool_name,
+                "reason": reason,
                 "occurred_at": occurred_at.isoformat(),
             }
         case AgentBudgetUpdated(
@@ -378,7 +413,7 @@ def to_payload(event: AgentEvent) -> dict[str, Any]:
                 "daily_token_cap": daily_token_cap,
                 "occurred_at": occurred_at.isoformat(),
             }
-        case AgentTargetPlanSet(
+        case AgentTargetPlanUpdated(
             agent_id=agent_id,
             target_plan_id=target_plan_id,
             occurred_at=occurred_at,
@@ -442,7 +477,7 @@ def from_stored(stored: StoredEvent) -> AgentEvent:
                 "AgentDeprecated",
                 lambda: AgentDeprecated(
                     agent_id=UUID(payload["agent_id"]),
-                    reason=payload.get("reason"),
+                    reason=payload["reason"],
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
             )
@@ -480,6 +515,7 @@ def from_stored(stored: StoredEvent) -> AgentEvent:
                 lambda: AgentToolRevoked(
                     agent_id=UUID(payload["agent_id"]),
                     tool_name=payload["tool_name"],
+                    reason=payload["reason"],
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
             )
@@ -493,10 +529,10 @@ def from_stored(stored: StoredEvent) -> AgentEvent:
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
             )
-        case "AgentTargetPlanSet":
+        case "AgentTargetPlanUpdated":
             return deserialize_or_raise(
-                "AgentTargetPlanSet",
-                lambda: AgentTargetPlanSet(
+                "AgentTargetPlanUpdated",
+                lambda: AgentTargetPlanUpdated(
                     agent_id=UUID(payload["agent_id"]),
                     target_plan_id=(
                         UUID(raw) if (raw := payload.get("target_plan_id")) is not None else None
@@ -516,7 +552,7 @@ __all__ = [
     "AgentEvent",
     "AgentResumed",
     "AgentSuspended",
-    "AgentTargetPlanSet",
+    "AgentTargetPlanUpdated",
     "AgentToolGranted",
     "AgentToolRevoked",
     "AgentVersioned",

@@ -23,7 +23,7 @@ design lock for CORA-vocabulary-alignment and Actor-collision risk.
 `AgentKind` (1-100 chars), `AgentName` (1-100 chars), `AgentDescription`
 (1-2000 chars), `AgentVersion` (1-50 chars), `AgentCanonicalUri` (1-2000
 chars, must start with https://), `AgentCapability` (1-100 chars per
-entry, cardinality cap 32), `AgentDeprecationReason` (1-500 chars).
+entry, cardinality cap 32).
 All follow the `validate_bounded_text` + `object.__setattr__` pattern
 from the shared `cora.shared.bounded_text` helper.
 
@@ -46,6 +46,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from cora.shared.bounded_text import bounded_name, validate_bounded_text
+from cora.shared.deprecation import DeprecationReason
 from cora.shared.identity import ActorId
 from cora.shared.text_bounds import REASON_MAX_LENGTH
 
@@ -186,21 +187,10 @@ class InvalidAgentCapabilitiesError(ValueError):
         self.count = count
 
 
-class InvalidAgentDeprecationReasonError(ValueError):
-    """The supplied deprecation reason is empty, whitespace-only, or too long."""
-
-    def __init__(self, value: str) -> None:
-        super().__init__(
-            f"Agent deprecation reason must be 1-{REASON_MAX_LENGTH} chars "
-            f"after trimming (got: {value!r})"
-        )
-        self.value = value
-
-
 class InvalidAgentSuspensionReasonError(ValueError):
     """The supplied suspension reason is empty, whitespace-only, or too long.
 
-    Mirrors `InvalidAgentDeprecationReasonError` shape. Suspension
+    Mirrors `InvalidAgentSuspensionReasonError` shape. Suspension
     reason carries operator-supplied free text (cost-overrun,
     output-spike, model-regression context) that operators reading
     the audit log later need.
@@ -408,8 +398,8 @@ class AgentCannotUpdateBudgetError(Exception):
         self.current_status = current_status
 
 
-class AgentCannotSetTargetPlanError(Exception):
-    """Attempted `set_agent_target_plan` against a `Deprecated` agent.
+class AgentCannotUpdateTargetPlanError(Exception):
+    """Attempted `update_agent_target_plan` against a `Deprecated` agent.
 
     Same source-set rule as `AgentCannotUpdateBudgetError`.
     """
@@ -616,25 +606,10 @@ class AgentCapability:
 
 
 @dataclass(frozen=True)
-class AgentDeprecationReason:
-    """Optional operator-supplied deprecation reason. Trimmed; 1-500 chars."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        trimmed = validate_bounded_text(
-            self.value,
-            max_length=REASON_MAX_LENGTH,
-            error_class=InvalidAgentDeprecationReasonError,
-        )
-        object.__setattr__(self, "value", trimmed)
-
-
-@dataclass(frozen=True)
 class AgentSuspensionReason:
     """Operator-supplied reason at suspension time. Trimmed; 1-500 chars.
 
-    Mirrors `AgentDeprecationReason` shape; carries cost-overrun /
+    Bounded operator text; carries cost-overrun /
     output-spike / model-regression context operators reading the
     audit log later need.
     """
@@ -839,7 +814,7 @@ class Agent:
     prompt_template_id: UUID | None = None
     capabilities: frozenset[AgentCapability] = field(default_factory=frozenset[AgentCapability])
     status: AgentStatus = AgentStatus.DEFINED
-    deprecation_reason: AgentDeprecationReason | None = None
+    deprecation_reason: DeprecationReason | None = None
     # ToolGrant + Suspended + AgentBudget
     tools: frozenset[ToolName] = field(default_factory=frozenset[ToolName])
     budget: AgentBudget | None = None
@@ -855,8 +830,8 @@ class Agent:
     suspended_by: ActorId | None = None
     resumed_by: ActorId | None = None
     # Runtime-mutable target Plan for an autonomous agent (the recipe the
-    # RunInitiator starts for each ready Subject), set by `set_agent_target_plan`
-    # and folded from `AgentTargetPlanSet`. Optional (None = unset); only the
+    # RunInitiator starts for each ready Subject), set by `update_agent_target_plan`
+    # and folded from `AgentTargetPlanUpdated`. Optional (None = unset); only the
     # consuming agent (RunInitiator) reads it, so it stays None for every other
     # agent kind. Additive-state default keeps legacy reconstruction clean.
     target_plan_id: UUID | None = None

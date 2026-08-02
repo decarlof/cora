@@ -34,6 +34,7 @@ from cora.infrastructure.routing import (
     get_principal_id,
     get_surface_id,
 )
+from cora.shared.deprecation import DeprecationReason
 
 
 class ModelRefResponse(BaseModel):
@@ -71,7 +72,7 @@ class AgentResponse(BaseModel):
     capabilities: list[str]
     versioned_at: datetime | None = None
     deprecated_at: datetime | None = None
-    deprecation_reason: str | None = None
+    deprecation_reason: DeprecationReason | None = None
 
 
 def _response_from_view(view: AgentView) -> AgentResponse:
@@ -95,9 +96,7 @@ def _response_from_view(view: AgentView) -> AgentResponse:
         capabilities=sorted(c.value for c in agent.capabilities),
         versioned_at=timestamps.versioned_at if timestamps is not None else None,
         deprecated_at=timestamps.deprecated_at if timestamps is not None else None,
-        deprecation_reason=(
-            agent.deprecation_reason.value if agent.deprecation_reason is not None else None
-        ),
+        deprecation_reason=agent.deprecation_reason,
     )
 
 

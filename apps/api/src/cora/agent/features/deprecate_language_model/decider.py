@@ -12,8 +12,8 @@ re-deprecating a Deprecated entry raises
   - State must not be None -> `LanguageModelNotFoundError`
   - Current status must be `Defined`, `Approved`, or
     `RetirementAnnounced` -> `LanguageModelCannotDeprecateError`
-  - `reason` REQUIRED; wrapped via `LanguageModelReason(...)`;
-    1-500 chars after trim -> `InvalidLanguageModelReasonError`.
+  - `reason` is the closed `DeprecationReason` enum; Pydantic rejects
+    an unknown value at the edge before the handler runs.
 """
 
 from datetime import datetime
@@ -23,7 +23,6 @@ from cora.agent.aggregates.language_model import (
     LanguageModelCannotDeprecateError,
     LanguageModelDeprecated,
     LanguageModelNotFoundError,
-    LanguageModelReason,
     LanguageModelStatus,
 )
 from cora.agent.features.deprecate_language_model.command import DeprecateLanguageModel
@@ -55,12 +54,10 @@ def decide(
     if state.status not in _DEPRECATABLE_STATUSES:
         raise LanguageModelCannotDeprecateError(state.id, state.status)
 
-    reason = LanguageModelReason(command.reason)
-
     return [
         LanguageModelDeprecated(
             language_model_id=state.id,
-            reason=reason.value,
+            reason=command.reason.value,
             occurred_at=now,
         )
     ]

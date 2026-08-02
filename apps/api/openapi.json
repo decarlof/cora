@@ -601,13 +601,12 @@
           "deprecation_reason": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/DeprecationReason"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Deprecation Reason"
+            ]
           },
           "description": {
             "anyOf": [
@@ -755,22 +754,6 @@
         ],
         "title": "AlternateIdentifierKind",
         "type": "string"
-      },
-      "AmendAllocationCeilingRequest": {
-        "description": "Body for `POST /allocations/{allocation_id}/ceiling`.",
-        "properties": {
-          "ceiling_usd": {
-            "description": "The post-amend USD ceiling (PUT semantics, not a delta). Finite and greater than 0.",
-            "exclusiveMinimum": 0.0,
-            "title": "Ceiling Usd",
-            "type": "number"
-          }
-        },
-        "required": [
-          "ceiling_usd"
-        ],
-        "title": "AmendAllocationCeilingRequest",
-        "type": "object"
       },
       "AmendClearanceRequest": {
         "description": "Body for `POST /clearances/{parent_id}/amend`.\n\nMirrors `RegisterClearanceRequest`'s child-fields exactly. The\n`parent_id` comes from the URL path, not the body.",
@@ -5462,6 +5445,23 @@
         "title": "DeclareCampaignSteeringRequest",
         "type": "object"
       },
+      "DecommissionAssetRequest": {
+        "description": "Body for `POST /assets/{asset_id}/decommission`.",
+        "properties": {
+          "reason": {
+            "description": "Operator-supplied free-text reason for the audit log.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DecommissionAssetRequest",
+        "type": "object"
+      },
       "DecommissionEnclosureRequest": {
         "additionalProperties": false,
         "description": "Body for `POST /enclosures/{enclosure_id}/decommission`.\n\n`reason` is operator-supplied free text (audit-log breadcrumb)\nexplaining why the enclosure is being decommissioned. Examples:\n\"hutch retired\", \"interlock chain replaced; re-registering\",\n\"duplicate of enclosure <id>\".",
@@ -6813,20 +6813,13 @@
         "description": "Body for `POST /agents/{agent_id}/deprecate`.",
         "properties": {
           "reason": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Optional operator-supplied deprecation reason (1-500 chars after trim). Pass null to omit.",
-            "title": "Reason"
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
           }
         },
+        "required": [
+          "reason"
+        ],
         "title": "DeprecateAgentRequest",
         "type": "object"
       },
@@ -6834,11 +6827,8 @@
         "description": "Body for `POST /assemblies/{assembly_id}/deprecate`.",
         "properties": {
           "reason": {
-            "description": "Operator-supplied reason for the deprecation (audit-log breadcrumb). REQUIRED. Mirrors decommission_mount's reason field shape.",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Reason",
-            "type": "string"
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
           }
         },
         "required": [
@@ -6850,6 +6840,10 @@
       "DeprecateCapabilityRequest": {
         "description": "Body for `POST /capabilities/{capability_id}/deprecate`.\n\nOptional `replaced_by_capability_id` pointer for the successor\nCapability. Omit entirely for deprecated-without-replacement.",
         "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          },
           "replaced_by_capability_id": {
             "anyOf": [
               {
@@ -6864,18 +6858,46 @@
             "title": "Replaced By Capability Id"
           }
         },
+        "required": [
+          "reason"
+        ],
         "title": "DeprecateCapabilityRequest",
+        "type": "object"
+      },
+      "DeprecateClearanceTemplateRequest": {
+        "description": "Body for `POST /clearance-templates/{template_id}/deprecate`.",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeprecateClearanceTemplateRequest",
+        "type": "object"
+      },
+      "DeprecateFamilyRequest": {
+        "description": "Body for `POST /families/{family_id}/deprecate`.",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeprecateFamilyRequest",
         "type": "object"
       },
       "DeprecateLanguageModelRequest": {
         "description": "Body for `POST /language-models/{language_model_id}/deprecate`.",
         "properties": {
           "reason": {
-            "description": "Operator-supplied deprecation reason (1-500 chars after trim). REQUIRED: withdrawing approval is a policy act the audit log must always carry context for.",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Reason",
-            "type": "string"
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
           }
         },
         "required": [
@@ -6884,15 +6906,26 @@
         "title": "DeprecateLanguageModelRequest",
         "type": "object"
       },
-      "DeprecateModelRequest": {
-        "description": "Body for `POST /models/{model_id}/deprecation`.\n\n`reason` is operator free text recording why the catalog entry is\nbeing retired (for example \"superseded by part RV120CCHL\", \"vendor\nEOL 2026\"). Trimmed and length-validated at the\n`ModelDeprecationReason` VO; whitespace-only is rejected as a\ndomain invariant violation (400).",
+      "DeprecateMethodRequest": {
+        "description": "Body for `POST /methods/{method_id}/deprecate`.",
         "properties": {
           "reason": {
-            "description": "Operator-supplied rationale for retiring this Model (for example 'superseded by RV120CCHL', 'vendor EOL 2026'). Free text; trimmed server-side.",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Reason",
-            "type": "string"
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeprecateMethodRequest",
+        "type": "object"
+      },
+      "DeprecateModelRequest": {
+        "description": "Body for `POST /models/{model_id}/deprecation`.\n\n`reason` is the closed `DeprecationReason` enum. An unknown value is\nrejected by Pydantic as a 422 before the handler runs. Vendor detail\nthat used to ride in free text (a part number, an EOL date) belongs\non the Model's own fields or a Caution, not on the terminal event.",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
           }
         },
         "required": [
@@ -6901,9 +6934,41 @@
         "title": "DeprecateModelRequest",
         "type": "object"
       },
+      "DeprecatePlanRequest": {
+        "description": "Body for `POST /plans/{plan_id}/deprecate`.",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeprecatePlanRequest",
+        "type": "object"
+      },
+      "DeprecatePracticeRequest": {
+        "description": "Body for `POST /practices/{practice_id}/deprecate`.",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeprecatePracticeRequest",
+        "type": "object"
+      },
       "DeprecateRecipeRequest": {
         "description": "Body for `POST /recipes/{recipe_id}/deprecate`.\n\nOptional `replaced_by_recipe_id` pointer for the successor\nRecipe. Omit entirely for deprecated-without-replacement.",
         "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DeprecationReason",
+            "description": "Why the template is no longer recommended. `Superseded`: a newer version replaces it, prior use stands. `Defective`: it was wrong, prior use is suspect. `Obsolete`: what it targeted no longer exists."
+          },
           "replaced_by_recipe_id": {
             "anyOf": [
               {
@@ -6918,8 +6983,21 @@
             "title": "Replaced By Recipe Id"
           }
         },
+        "required": [
+          "reason"
+        ],
         "title": "DeprecateRecipeRequest",
         "type": "object"
+      },
+      "DeprecationReason": {
+        "description": "Closed reason for deprecating a versionable template.",
+        "enum": [
+          "Superseded",
+          "Defective",
+          "Obsolete"
+        ],
+        "title": "DeprecationReason",
+        "type": "string"
       },
       "DeregisterSupplyRequest": {
         "description": "Body for `POST /supplies/{supply_id}/deregister`.\n\n`reason` is operator-supplied free text (audit-log breadcrumb)\nexplaining why the supply is being deregistered. Examples:\n\"typo on scope at registration; re-registering correctly\",\n\"beamline retired\", \"duplicate of supply <id>\".",
@@ -14027,6 +14105,13 @@
       "RevokeToolFromAgentRequest": {
         "description": "Body for `POST /agents/{agent_id}/tools/revoke`.",
         "properties": {
+          "reason": {
+            "description": "Operator-supplied reason for the revocation (audit-log breadcrumb; no PII). Taking a tool away narrows what an autonomous Agent may do mid-campaign, so the record should say why.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
           "tool_name": {
             "description": "MCP tool name to remove from the Agent's allowlist (1-100 chars).",
             "maxLength": 100,
@@ -14036,7 +14121,8 @@
           }
         },
         "required": [
-          "tool_name"
+          "tool_name",
+          "reason"
         ],
         "title": "RevokeToolFromAgentRequest",
         "type": "object"
@@ -14668,26 +14754,6 @@
         ],
         "title": "ServingRoute",
         "type": "string"
-      },
-      "SetAgentTargetPlanRequest": {
-        "description": "Body for `POST /agents/{agent_id}/target-plan`.",
-        "properties": {
-          "target_plan_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The recipe Plan this autonomous agent starts for each ready Subject. Pass null to clear the target (the agent initiates nothing until a Plan is set again).",
-            "title": "Target Plan Id"
-          }
-        },
-        "title": "SetAgentTargetPlanRequest",
-        "type": "object"
       },
       "SignSealPointerRequest": {
         "additionalProperties": false,
@@ -15958,6 +16024,42 @@
         "title": "UpdateAgentBudgetRequest",
         "type": "object"
       },
+      "UpdateAgentTargetPlanRequest": {
+        "description": "Body for `POST /agents/{agent_id}/target-plan`.",
+        "properties": {
+          "target_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recipe Plan this autonomous agent starts for each ready Subject. Pass null to clear the target (the agent initiates nothing until a Plan is supplied again).",
+            "title": "Target Plan Id"
+          }
+        },
+        "title": "UpdateAgentTargetPlanRequest",
+        "type": "object"
+      },
+      "UpdateAllocationCeilingRequest": {
+        "description": "Body for `POST /allocations/{allocation_id}/ceiling`.",
+        "properties": {
+          "ceiling_usd": {
+            "description": "The post-update USD ceiling (PUT semantics, not a delta). Finite and greater than 0.",
+            "exclusiveMinimum": 0.0,
+            "title": "Ceiling Usd",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ceiling_usd"
+        ],
+        "title": "UpdateAllocationCeilingRequest",
+        "type": "object"
+      },
       "UpdateAssetPartitionRuleRequest": {
         "description": "Body for `POST /assets/{asset_id}/partition-rule`.\n\n`partition_rule` is a discriminated-union Pydantic model covering\nthe 5 PartitionRule shapes (Affine, Aggregation, LookupTable,\nCompositePartition, SolverReference), or null to clear the rule.\n\nThe route converts the Pydantic model to the frozen-dataclass union\nbefore invoking the handler. Pydantic 422 fires on shape mismatch\n(unknown kind, missing required field for kind, etc.).",
         "properties": {
@@ -16632,6 +16734,23 @@
           "contributed_affordances"
         ],
         "title": "WiredAssetItem",
+        "type": "object"
+      },
+      "WithdrawClearanceTemplateRequest": {
+        "description": "Body for `POST /clearance-templates/{template_id}/withdraw`.",
+        "properties": {
+          "reason": {
+            "description": "Why the template is being withdrawn. Free text: withdrawal causes are open-ended (superseded by a facility policy change, drafted in error, the hazard class no longer applies), unlike deprecation, where the reason decides whether prior data is trustworthy and the set is closed.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "WithdrawClearanceTemplateRequest",
         "type": "object"
       },
       "WithdrawEditionRequest": {
@@ -18690,16 +18809,6 @@
           "204": {
             "description": "Successful Response"
           },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Reason is empty / whitespace-only / over-cap after trim."
-          },
           "403": {
             "content": {
               "application/json": {
@@ -18922,7 +19031,7 @@
     },
     "/agents/{agent_id}/target-plan": {
       "post": {
-        "operationId": "post_agents_set_target_plan_agents__agent_id__target_plan_post",
+        "operationId": "post_agents_update_target_plan_agents__agent_id__target_plan_post",
         "parameters": [
           {
             "description": "Target agent's id.",
@@ -18960,7 +19069,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetAgentTargetPlanRequest"
+                "$ref": "#/components/schemas/UpdateAgentTargetPlanRequest"
               }
             }
           },
@@ -19004,7 +19113,7 @@
             "description": "Request body or path parameter failed schema validation."
           }
         },
-        "summary": "Set or clear an autonomous Agent's target Plan (PUT semantics; null clears)",
+        "summary": "Update or clear an autonomous Agent's target Plan (PUT semantics; null clears)",
         "tags": [
           "agent"
         ]
@@ -19511,7 +19620,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AmendAllocationCeilingRequest"
+                "$ref": "#/components/schemas/UpdateAllocationCeilingRequest"
               }
             }
           },
@@ -19559,13 +19668,13 @@
                 }
               }
             },
-            "description": "Allocation is not in Granted or Active status (amend_allocation_ceiling cannot rewrite a closed envelope)."
+            "description": "Allocation is not in Granted or Active status (update_allocation_ceiling cannot rewrite a closed envelope)."
           },
           "422": {
             "description": "Request body failed schema validation (missing field, non-positive ceiling) or path parameter is not a UUID."
           }
         },
-        "summary": "Amend an Allocation's USD ceiling (PUT semantics)",
+        "summary": "Update an Allocation's USD ceiling (PUT semantics)",
         "tags": [
           "budget"
         ]
@@ -21601,6 +21710,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecommissionAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -26423,6 +26542,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateClearanceTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -26617,6 +26746,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawClearanceTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -30746,6 +30885,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateFamilyRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -34776,16 +34925,6 @@
           "204": {
             "description": "Successful Response"
           },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Reason is empty / whitespace-only / over-cap after trim."
-          },
           "403": {
             "content": {
               "application/json": {
@@ -35335,6 +35474,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateMethodRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -36015,16 +36164,6 @@
         "responses": {
           "204": {
             "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Domain invariant violated (for example whitespace-only reason after trimming)."
           },
           "403": {
             "content": {
@@ -37562,6 +37701,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecatePlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -38751,6 +38900,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecatePracticeRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
