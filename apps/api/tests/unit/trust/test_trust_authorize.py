@@ -19,10 +19,13 @@ from cora.infrastructure.adapters.in_memory_event_store import InMemoryEventStor
 from cora.infrastructure.event_envelope import to_new_event
 from cora.infrastructure.ports import (
     Allow,
+    Conjunct,
     Deny,
     FakeClock,
     FixedIdGenerator,
+    PrincipalLiveness,
 )
+from cora.shared.liveness import LIVENESS_EXEMPT_COMMANDS
 from cora.shared.logbook import LogbookFieldSpec, LogbookSchema
 from cora.trust.aggregates.conduit import (
     LOGBOOK_KIND_VERDICT,
@@ -368,3 +371,198 @@ async def test_skips_traversal_when_verdict_logbook_was_closed() -> None:
     result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", _TARGET_CONDUIT_ID)
     assert isinstance(result, Allow)
     assert verdicts.all() == []
+
+
+class _FixedLivenessLookup:
+    """Returns one liveness value for every principal."""
+
+    def __init__(self, liveness: PrincipalLiveness) -> None:
+        self._liveness = liveness
+
+    async def liveness_of(self, principal_id: UUID) -> PrincipalLiveness:
+        _ = principal_id
+        return self._liveness
+
+
+class _FailingLivenessLookup:
+    """Raises, standing in for an event-store hiccup mid-beamtime."""
+
+    async def liveness_of(self, principal_id: UUID) -> PrincipalLiveness:
+        _ = principal_id
+        msg = "event store unreachable"
+        raise RuntimeError(msg)
+
+
+@pytest.mark.unit
+async def test_unwired_liveness_lookup_leaves_the_gate_unchanged() -> None:
+    """The default wiring must not start refusing anything.
+
+    Enforcement is opt-in, so every deployment and every test that does
+    not wire a lookup keeps exactly the behaviour it had before liveness
+    existed.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    authorize = TrustAuthorize(store, policy_id=_POLICY_ID)
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", UUID(int=0))
+
+    assert isinstance(result, Allow)
+    assert result.evaluated == frozenset({Conjunct.POLICY})
+
+
+@pytest.mark.unit
+async def test_deactivated_principal_is_refused_though_the_policy_permits_it() -> None:
+    """The whole point of the slice, in one test.
+
+    The Policy still names this principal and still permits the command.
+    Deactivation alone turns the Allow into a Deny, which is what it
+    already does for an agent and has never done for a person.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    authorize = TrustAuthorize(
+        store,
+        policy_id=_POLICY_ID,
+        liveness_lookup=_FixedLivenessLookup(PrincipalLiveness.DEACTIVATED),
+        liveness_enforced=True,
+    )
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", UUID(int=0))
+
+    assert isinstance(result, Deny)
+    assert "reactivate_actor" in result.reason
+
+
+@pytest.mark.unit
+async def test_active_principal_still_permitted_with_liveness_wired() -> None:
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    authorize = TrustAuthorize(
+        store,
+        policy_id=_POLICY_ID,
+        liveness_lookup=_FixedLivenessLookup(PrincipalLiveness.ACTIVE),
+        liveness_enforced=True,
+    )
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", UUID(int=0))
+
+    assert isinstance(result, Allow)
+    assert result.evaluated == frozenset({Conjunct.POLICY, Conjunct.LIVENESS})
+
+
+@pytest.mark.unit
+async def test_liveness_read_failure_fails_open_without_naming_the_conjunct() -> None:
+    """A broken lookup must not lock out a live beamline.
+
+    Fail-closed here would turn a transient event-store fault into a
+    site-wide outage, which is worse than briefly not enforcing a switch
+    an operator flips by hand. The verdict still tells the truth: the
+    conjunct is absent from `evaluated`, so nothing claims a check ran.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    authorize = TrustAuthorize(
+        store,
+        policy_id=_POLICY_ID,
+        liveness_lookup=_FailingLivenessLookup(),
+        liveness_enforced=True,
+    )
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", UUID(int=0))
+
+    assert isinstance(result, Allow)
+    assert result.evaluated == frozenset({Conjunct.POLICY})
+
+
+class _RecordingLivenessLookup:
+    """Records which principal it was asked about."""
+
+    def __init__(self, liveness: PrincipalLiveness = PrincipalLiveness.ACTIVE) -> None:
+        self._liveness = liveness
+        self.asked: list[UUID] = []
+
+    async def liveness_of(self, principal_id: UUID) -> PrincipalLiveness:
+        self.asked.append(principal_id)
+        return self._liveness
+
+
+@pytest.mark.unit
+async def test_liveness_is_resolved_for_the_caller_not_another_id() -> None:
+    """Pins WHICH id reaches the lookup.
+
+    The gate has four UUIDs in scope at this point (principal, conduit,
+    surface, policy). Passing the wrong one would authorize against a
+    different principal's switch and every other liveness test would
+    stay green, because the fakes ignore their argument. This one does
+    not ignore it.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    lookup = _RecordingLivenessLookup()
+    authorize = TrustAuthorize(
+        store,
+        policy_id=_POLICY_ID,
+        liveness_lookup=lookup,
+        liveness_enforced=True,
+    )
+
+    await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", _CONDUIT_ID)
+
+    assert lookup.asked == [_ALLOWED_PRINCIPAL]
+
+
+@pytest.mark.unit
+async def test_shadow_posture_logs_without_denying() -> None:
+    """Wired but not enforced: the measurement runs, nobody is refused.
+
+    This is the state a deployment sits in for a full beamtime cycle, so
+    it needs its own test rather than being inferred from the enforced
+    one.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store)
+    lookup = _RecordingLivenessLookup(PrincipalLiveness.DEACTIVATED)
+    authorize = TrustAuthorize(store, policy_id=_POLICY_ID, liveness_lookup=lookup)
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, "RegisterActor", _CONDUIT_ID)
+
+    assert isinstance(result, Allow)
+    assert result.evaluated == frozenset({Conjunct.POLICY})
+    assert lookup.asked == [_ALLOWED_PRINCIPAL]
+
+
+@pytest.mark.unit
+async def test_enforcement_without_a_lookup_is_refused_at_construction() -> None:
+    """A deployment that asked for enforcement must not silently get none."""
+    store = InMemoryEventStore()
+
+    with pytest.raises(ValueError, match="liveness_enforced requires"):
+        TrustAuthorize(store, policy_id=_POLICY_ID, liveness_enforced=True)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("command_name", sorted(LIVENESS_EXEMPT_COMMANDS))
+async def test_exempt_command_is_never_refused_on_liveness(command_name: str) -> None:
+    """A switched-off principal can still stop, finish, and record.
+
+    Denying these is the stranded-Procedure and silenced-brake pair the
+    human-envelope design fitness-tests against: a scan whose operator was
+    deactivated mid-run must still be completable and abortable, and
+    switching someone off must never be the reason a stop does not land.
+    Parametrized over the whole set so adding a member cannot skip it.
+    """
+    store = InMemoryEventStore()
+    await _seed_policy(store, commands=frozenset({command_name}))
+    lookup = _RecordingLivenessLookup(PrincipalLiveness.DEACTIVATED)
+    authorize = TrustAuthorize(
+        store,
+        policy_id=_POLICY_ID,
+        liveness_lookup=lookup,
+        liveness_enforced=True,
+    )
+
+    result = await authorize.authorize(_ALLOWED_PRINCIPAL, command_name, _CONDUIT_ID)
+
+    assert isinstance(result, Allow)
+    assert lookup.asked == []

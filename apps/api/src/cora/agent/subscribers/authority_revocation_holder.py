@@ -1,13 +1,57 @@
-"""Reaction (kill-switch K3): a PolicyGrantRevoked -> hold the revoked
-principal's in-flight Runs.
+"""Reaction (kill-switch K3): an operator withdraws a principal -> hold the
+in-flight Runs that principal drives.
 
 AuthorityRevocationHolder is CORA's deterministic kill-switch subscriber. It
-reacts to `PolicyGrantRevoked` (the K1 trigger event), asks the
-`RunActorInvolvementLookup` (K2) for the in-flight Runs the revoked principal
-drives, and holds each -- pausing the runs a principal can no longer be trusted
-to drive. It records one
-`Decision(context=AuthorityRevocationHold, parent_id=<revocation event>)` per
-run for provenance.
+asks the `RunActorInvolvementLookup` (K2) for the in-flight Runs the withdrawn
+principal drives, and holds each -- pausing the runs a principal can no longer
+be trusted to drive. It records one
+`Decision(context=AuthorityRevocationHold, parent_id=<trigger event>)` per run
+for provenance.
+
+## Two triggers, because an operator has two ways to say the same thing
+
+`PolicyGrantRevoked` (the original K1 trigger) removes a principal from a
+Policy. `ActorDeactivated` switches the principal off entirely. To a running
+experiment these mean the identical thing: this principal may no longer drive
+it. Only the first was subscribed for a long time, so revoking someone's grant
+paused their runs while deactivating them left the very same runs going, and
+the more total gesture was the weaker one.
+
+That asymmetry is the same shape as the one the liveness conjunct closed at the
+gate. There, `Actor.active` stopped an agent and did nothing to a person; here,
+one operator gesture stopped the work and its twin did not. Neither was a
+decision anyone made; both were gaps between mechanisms nobody had compared.
+
+The two events name the principal differently (`principal_id` versus
+`actor_id`), which `_TRIGGER_PRINCIPAL_FIELD` maps. Everything downstream is
+identical, so the careful parts (derived claim ids, HoldDeferred on a terminal
+or missing run, concurrency folding) stay shared rather than duplicated, and
+`apply` guards on the SAME map that extracts the id so the subscription and
+the guard cannot drift apart.
+
+Deactivation is REVERSIBLE (`reactivate_actor`) and reactivation does NOT
+release these holds, which was very nearly a trap. The claim placed here is
+`authority-revocation`, and until the resume surfaces exposed `cause` there was
+no way to discharge it: `ResumeRun` defaults to `operator`, every route and
+tool omitted the field, and the decider refuses while another concern's claim
+stands. So a mis-clicked deactivation followed instantly by a reactivation left
+every run that principal drove permanently held, with `abort_run` and its
+destroyed beamtime as the only exit.
+
+The principle survives the fix: a hold is released by a deliberate act naming
+the concern that placed it, not as a side effect of switching someone back on,
+because reinstating a person says they may drive again and not that whatever
+was paused should resume unattended. What was wrong was shipping that principle
+with no act available to perform. An automatic release on `ActorReactivated`, mirroring
+`ratification_release`, was proposed in review and is REFUSED. Releasing the
+last active claim does not merely clear a flag: `resume_run`'s decider emits
+`RunResumed` and the Run goes Held -> Running, so an auto-release would
+restart beam motion as a side effect of an account-shaped gesture, possibly
+hours after the work was paused and with nobody watching. The ratification
+precedent does resume automatically, and correctly, because a granted
+ratification IS the decision to proceed; reinstating a person is not. The
+operator remedy is `resume_run` naming the cause, exposed on the route and
+tool for exactly this.
 
 ## Cross-BC write via Pattern C (not the hold_run handler)
 
@@ -67,7 +111,7 @@ kill-switch that must be turned on is not a kill-switch. Holding is reversible
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 from uuid import UUID, uuid5
 
 from cora.access.aggregates.actor import load_actor
@@ -117,9 +161,16 @@ if TYPE_CHECKING:
 _DECISION_STREAM_TYPE = "Decision"
 _RUN_STREAM_TYPE = "Run"
 _HOLD_COMMAND_NAME = "HoldRun"
+# Two operator gestures mean the same thing to a running experiment: this
+# principal may no longer drive it. The events name the principal differently,
+# so the map does double duty as the subscription guard and the id extractor.
+_TRIGGER_PRINCIPAL_FIELD: Final[dict[str, str]] = {
+    "PolicyGrantRevoked": "principal_id",
+    "ActorDeactivated": "actor_id",
+}
+
 _COMMAND_NAME = "AuthorityRevocationHolderSubscriber"
 _DECISION_RULE = "agent:AuthorityRevocationHolder:v1"
-_TRIGGER_EVENT_TYPE = "PolicyGrantRevoked"
 
 # Stable namespace for deriving deterministic Decision ids from the (revocation
 # event, run) pair. Follows the sibling suffix convention (...0000<block>0002,
@@ -154,7 +205,7 @@ class AuthorityRevocationHolderSubscriber:
     """
 
     name = "authority_revocation_holder"
-    subscribed_event_types = frozenset({"PolicyGrantRevoked"})
+    subscribed_event_types = frozenset({"PolicyGrantRevoked", "ActorDeactivated"})
     batch_size = 1
 
     def __init__(
@@ -173,10 +224,10 @@ class AuthorityRevocationHolderSubscriber:
         self.id_generator = id_generator
 
     async def apply(self, event: StoredEvent, conn: ConnectionLike) -> None:
-        """Process one PolicyGrantRevoked; hold the revoked principal's in-flight runs."""
+        """Process one withdrawal gesture; hold the runs that principal drives."""
         # conn unused: cross-BC writes go through the event store, like the other subscribers.
         _ = conn
-        if event.event_type != _TRIGGER_EVENT_TYPE:
+        if event.event_type not in _TRIGGER_PRINCIPAL_FIELD:
             return
         try:
             await self._handle_revocation(event)
@@ -200,12 +251,35 @@ class AuthorityRevocationHolderSubscriber:
             # same way they disable any agent, not through a bespoke gate.
             return
 
-        revoked_principal_id = UUID(event.payload["principal_id"])
+        revoked_principal_id = UUID(event.payload[_TRIGGER_PRINCIPAL_FIELD[event.event_type]])
         run_ids = await self.run_actor_involvement_lookup.runs_driven_by(revoked_principal_id)
         if not run_ids:
-            _log.info(
+            # AMBIGUOUS, and deliberately logged as such. "No in-flight runs"
+            # is either the ordinary case (this principal was driving nothing)
+            # or a silent kill-switch failure: `proj_run_actor_involvement`
+            # carries its own bookmark, so a withdrawal that lands before the
+            # matching RunStarted has drained sees an empty result, advances
+            # this subscriber's bookmark, and never sweeps. Withdrawal is the
+            # incident-time gesture, which makes that the hottest path for the
+            # race rather than a remote one.
+            #
+            # WARNING not INFO because the two readings cannot be told apart
+            # here and one of them is a safety control that did nothing. The
+            # trigger position is emitted so an operator or an alert can
+            # compare it against the projection's own progress after the fact.
+            #
+            # Comparing the bookmarks inline was considered and rejected:
+            # `read_bookmark` takes a FOR UPDATE lock, so this subscriber would
+            # be locking another projection's row on every withdrawal, trading
+            # a rare missed hold for a routine deadlock risk. Closing it
+            # properly needs a retry or sweep the subscriber framework does not
+            # offer yet.
+            _log.warning(
                 "authority_revocation_holder.no_in_flight_runs",
                 revoked_principal_id=str(revoked_principal_id),
+                trigger_event_type=event.event_type,
+                trigger_position=event.position,
+                note="ambiguous: principal drove nothing, or K2 projection lagged",
             )
             return
 

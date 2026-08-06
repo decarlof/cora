@@ -50,14 +50,30 @@ class Conjunct(StrEnum):
 
       - `Policy` -- the Policy aggregate's conduit, surface,
                     permitted-principal, and permitted-command predicate
+      - `Liveness` -- whether the calling principal is a registered
+                    Actor that an operator has not switched off. Reads
+                    `Actor.active`, one fact that describes a human and
+                    an agent identically because `Agent.id == Actor.id`.
 
     Members are added as conjuncts land, never ahead of them. An
     unpopulated member would let a result claim it evaluated something
     no code checks, which is the one failure this vocabulary exists to
     make impossible.
+
+    A member appearing in `evaluated` means the decision CONSULTED it,
+    not that the deployment has it wired. `Liveness` is absent when the
+    posture is "off" or "shadow", when the command is exempt, or when
+    the read failed, so an absence distinguishes "never asked" from
+    "asked and passed".
+
+    That distinction lives on the RESULT and nowhere else today: the
+    `Verdict` entry row has no conjunct column, so `evaluated` is not
+    persisted. Do not describe the verdict logbook as recording which
+    conjuncts ran until it carries them.
     """
 
     POLICY = "Policy"
+    LIVENESS = "Liveness"
 
 
 @dataclass(frozen=True)
